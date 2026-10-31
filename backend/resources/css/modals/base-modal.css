@@ -1,0 +1,260 @@
+.sc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    z-index: 9999;
+
+    display: grid;
+    place-items: center;
+
+    padding: 24px;
+    box-sizing: border-box;
+
+    background: rgba(31, 41, 55, 0.5);
+}
+
+.sc-modal {
+    display: flex;
+    flex-direction: column;
+
+    width: 100%;
+    max-height: calc(100dvh - 48px);
+
+    margin: 0;
+
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16);
+
+    overflow: hidden;
+    outline: none;
+}
+
+.sc-modal-small {
+    max-width: 400px;
+}
+
+.sc-modal-medium {
+    max-width: 560px;
+}
+
+.sc-modal-large {
+    max-width: 760px;
+}
+
+.sc-modal-header {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 20px;
+    padding: 22px 52px;
+
+    background: #166534;
+    border-bottom: 1px solid #166534;
+}
+
+.sc-modal-heading {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+}
+
+.sc-modal-heading h2 {
+    margin: 0;
+
+    color: #ffffff;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.sc-modal-heading p {
+    margin: 6px 0 0;
+
+    color: #ffffff;
+    opacity: 0.85;
+
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.sc-modal-close {
+    position: absolute;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    width: 28px;
+    height: 28px;
+
+    padding: 0;
+
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+
+    color: #ffffff;
+    font-size: 24px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.sc-modal-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+
+.sc-modal-close:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+.sc-modal-body {
+    flex: 1;
+    min-height: 0;
+
+    padding: 24px;
+
+    background: #ffffff;
+
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.sc-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+
+    padding: 16px 24px;
+
+    background: #f5f8f4;
+    border-top: 1px solid #e5e7eb;
+}
+
+.sc-modal-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 36px;
+    padding: 0 16px;
+
+    border: 1px solid transparent;
+    border-radius: 5px;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.sc-modal-button-primary {
+    background: #166534;
+    border-color: #166534;
+    color: #ffffff;
+}
+
+.sc-modal-button-primary:hover:not(:disabled) {
+    background: #14532d;
+    border-color: #14532d;
+}
+
+.sc-modal-button-secondary {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #1f2937;
+}
+
+.sc-modal-button-secondary:hover:not(:disabled) {
+    background: #f5f8f4;
+}
+
+.sc-modal-button-danger {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    color: #ffffff;
+}
+
+.sc-modal-button-danger:hover:not(:disabled) {
+    background: #991b1b;
+    border-color: #991b1b;
+}
+
+.sc-modal-button:focus-visible {
+    outline: 2px solid #166534;
+    outline-offset: 2px;
+}
+
+.sc-modal-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .sc-modal-overlay {
+        padding: 12px;
+    }
+
+    .sc-modal {
+        max-height: calc(100dvh - 24px);
+    }
+
+    .sc-modal-header {
+        padding: 18px 48px;
+        gap: 12px;
+    }
+
+    .sc-modal-heading h2 {
+        font-size: 16px;
+    }
+
+    .sc-modal-heading p {
+        font-size: 11px;
+    }
+
+    .sc-modal-close {
+        right: 14px;
+        width: 26px;
+        height: 26px;
+    }
+
+    .sc-modal-body {
+        padding: 18px;
+    }
+
+    .sc-modal-footer {
+        padding: 14px 18px;
+    }
+
+    .sc-modal-button {
+        min-height: 36px;
+        padding: 0 14px;
+    }
+}

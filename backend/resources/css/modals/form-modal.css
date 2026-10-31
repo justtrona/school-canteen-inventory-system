@@ -1,0 +1,458 @@
+/* ========================================
+   FORM MODAL
+======================================== */
+
+.sc-form-modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* ========================================
+   SECTIONS
+======================================== */
+
+.sc-form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sc-form-section + .sc-form-section {
+    padding-top: 22px;
+    border-top: 1px solid #e9eeeb;
+}
+
+.sc-form-section-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sc-form-section-title {
+    margin: 0;
+
+    color: #25332c;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.5;
+}
+
+.sc-form-section-description {
+    margin: 0;
+
+    color: #7b8780;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* ========================================
+   FIELD LAYOUT
+======================================== */
+
+.sc-form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.sc-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+}
+
+/* ========================================
+   LABELS
+======================================== */
+
+.sc-form-label {
+    display: flex;
+    align-items: center;
+
+    color: #344238;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.sc-form-required {
+    margin-left: 4px;
+    color: #c24141;
+}
+
+.sc-form-optional {
+    margin-left: auto;
+
+    color: #929d96;
+    font-size: 11px;
+    font-weight: 400;
+}
+
+/* ========================================
+   INPUTS
+======================================== */
+
+.sc-form-input,
+.sc-form-select,
+.sc-form-textarea {
+    width: 100%;
+    box-sizing: border-box;
+
+    background: #ffffff;
+    border: 1px solid #d7dfda;
+    border-radius: 6px;
+
+    color: #25332c;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+
+    outline: none;
+
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.sc-form-input,
+.sc-form-select {
+    height: 42px;
+    padding: 0 12px;
+}
+
+.sc-form-textarea {
+    min-height: 76px;
+    padding: 11px 12px;
+    resize: vertical;
+}
+
+.sc-form-input:hover,
+.sc-form-select:hover,
+.sc-form-textarea:hover {
+    border-color: #aebdb3;
+}
+
+.sc-form-input:focus,
+.sc-form-select:focus,
+.sc-form-textarea:focus {
+    border-color: #438460;
+    box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.08);
+}
+
+.sc-form-input::placeholder,
+.sc-form-textarea::placeholder {
+    color: #a0aaa4;
+}
+
+.sc-form-select {
+    cursor: pointer;
+}
+
+/* ========================================
+   DISABLED FIELDS
+======================================== */
+
+.sc-form-input:disabled,
+.sc-form-select:disabled,
+.sc-form-textarea:disabled {
+    background: #f5f7f5;
+    border-color: #e2e8e3;
+    color: #98a29b;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   VALIDATION
+======================================== */
+
+.sc-form-input.is-invalid,
+.sc-form-select.is-invalid,
+.sc-form-textarea.is-invalid,
+.sc-form-input[aria-invalid="true"],
+.sc-form-select[aria-invalid="true"],
+.sc-form-textarea[aria-invalid="true"] {
+    border-color: #dc2626;
+}
+
+.sc-form-error {
+    margin: 0;
+
+    color: #b91c1c;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.sc-form-help {
+    margin: 0;
+
+    color: #7b8780;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* ========================================
+   PRICE INPUT
+======================================== */
+
+.sc-form-price {
+    display: flex;
+    align-items: center;
+
+    height: 42px;
+
+    background: #ffffff;
+    border: 1px solid #d7dfda;
+    border-radius: 6px;
+
+    overflow: hidden;
+
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.sc-form-price:hover {
+    border-color: #aebdb3;
+}
+
+.sc-form-price:focus-within {
+    border-color: #438460;
+    box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.08);
+}
+
+.sc-form-price:has([aria-invalid="true"]) {
+    border-color: #dc2626;
+}
+
+.sc-form-currency {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 44px;
+    height: 100%;
+    flex-shrink: 0;
+
+    background: #f6f8f6;
+    border-right: 1px solid #e5eae6;
+
+    color: #526158;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.sc-form-price-input {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+
+    padding: 0 12px;
+
+    background: transparent;
+    border: none;
+    outline: none;
+
+    color: #25332c;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.sc-form-price-input:focus {
+    outline: none;
+}
+
+.sc-form-price-input::placeholder {
+    color: #a0aaa4;
+}
+
+.sc-form-price-input::-webkit-inner-spin-button,
+.sc-form-price-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.sc-form-price-input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+/* ========================================
+   STATUS SELECTOR
+======================================== */
+
+.sc-form-status {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.sc-form-status-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+
+    min-height: 42px;
+    padding: 10px 14px;
+
+    background: #ffffff;
+    border: 1px solid #d7dfda;
+    border-radius: 6px;
+
+    color: #65736a;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.sc-form-status-option:hover {
+    background: #f7faf8;
+    border-color: #b5c5ba;
+}
+
+.sc-form-status-option.selected {
+    background: #edf6ef;
+    border-color: #438460;
+    color: #166534;
+}
+
+.sc-form-status-option:focus-visible {
+    outline: 2px solid #166534;
+    outline-offset: 2px;
+}
+
+.sc-form-status-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+}
+
+.sc-form-status-dot.active {
+    background: #16a34a;
+}
+
+.sc-form-status-dot.inactive {
+    background: #9ca3af;
+}
+
+/* ========================================
+   CHECKBOX
+======================================== */
+
+.sc-form-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.sc-form-checkbox {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+
+    accent-color: #166534;
+    cursor: pointer;
+}
+
+.sc-form-checkbox-label {
+    color: #374151;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* ========================================
+   INFORMATION NOTICE
+======================================== */
+
+.sc-form-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+
+    padding: 13px 14px;
+
+    background: #f6f8f7;
+    border: 1px solid #e4ebe6;
+    border-radius: 6px;
+}
+
+.sc-form-notice-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+
+    background: #e5ede7;
+    border-radius: 50%;
+
+    color: #58715f;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.sc-form-notice-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sc-form-notice-title {
+    margin: 0;
+
+    color: #374b40;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.sc-form-notice-description {
+    margin: 0;
+
+    color: #7b8780;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 640px) {
+    .sc-form-modal-form {
+        gap: 20px;
+    }
+
+    .sc-form-section {
+        gap: 14px;
+    }
+
+    .sc-form-section + .sc-form-section {
+        padding-top: 20px;
+    }
+
+    .sc-form-row {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .sc-form-status {
+        gap: 8px;
+    }
+
+    .sc-form-status-option {
+        padding: 10px;
+    }
+}

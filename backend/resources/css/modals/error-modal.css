@@ -1,0 +1,89 @@
+/* ========================================
+   ERROR MODAL
+======================================== */
+
+/* CONTENT */
+
+.sc-error-modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    gap: 16px;
+
+    padding: 8px 0;
+
+    text-align: center;
+}
+
+/* ERROR ICON */
+
+.sc-error-modal-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 52px;
+    height: 52px;
+
+    flex-shrink: 0;
+
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 50%;
+
+    color: #b91c1c;
+}
+
+.sc-error-modal-icon svg {
+    display: block;
+}
+
+/* MESSAGE */
+
+.sc-error-modal-message {
+    max-width: 320px;
+    margin: 0;
+
+    color: #374151;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* ERROR DETAILS */
+
+.sc-error-modal-details {
+    width: 100%;
+    box-sizing: border-box;
+
+    padding: 12px 14px;
+
+    background: #fefafa;
+    border: 1px solid #fee2e2;
+    border-radius: 5px;
+
+    color: #7f1d1d;
+    font-size: 12px;
+    line-height: 1.6;
+
+    text-align: left;
+
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.sc-error-modal-details p {
+    margin: 0;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 640px) {
+    .sc-error-modal-content {
+        gap: 14px;
+    }
+
+    .sc-error-modal-message {
+        font-size: 12px;
+    }
+}
