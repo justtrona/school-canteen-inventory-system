@@ -1,3 +1,4 @@
+
 /* ========================================
    FORM MODAL
 ======================================== */
@@ -424,6 +425,19 @@
     color: #7b8780;
     font-size: 11px;
     line-height: 1.6;
+}
+
+/* ========================================
+   SCROLLBAR
+======================================== */
+
+.sc-modal-body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.sc-modal-body::-webkit-scrollbar {
+    display: none;
 }
 
 /* ========================================

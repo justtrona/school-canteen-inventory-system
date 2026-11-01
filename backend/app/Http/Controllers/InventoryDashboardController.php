@@ -14,25 +14,23 @@ class InventoryDashboardController extends Controller
     public function index(): Response
     {
         $statistics = [
-            'total_products' => Product::count(),
+            'total_products' => Product::whereNull('archived_at')
+                ->count(),
 
-            'in_stock' => Product::where(
-                'quantity',
-                '>',
-                self::LOW_STOCK_THRESHOLD
-            )->count(),
+            'in_stock' => Product::whereNull('archived_at')
+                ->where('quantity', '>', self::LOW_STOCK_THRESHOLD)
+                ->count(),
 
-            'low_stock' => Product::whereBetween(
-                'quantity',
-                [1, self::LOW_STOCK_THRESHOLD]
-            )->count(),
+            'low_stock' => Product::whereNull('archived_at')
+                ->whereBetween('quantity', [1, self::LOW_STOCK_THRESHOLD])
+                ->count(),
 
-            'out_of_stock' => Product::where(
-                'quantity',
-                0
-            )->count(),
+            'out_of_stock' => Product::whereNull('archived_at')
+                ->where('quantity', 0)
+                ->count(),
 
-            'total_stock_units' => Product::sum('quantity'),
+            'total_stock_units' => Product::whereNull('archived_at')
+                ->sum('quantity'),
         ];
 
         $recentMovements = StockMovement::with([

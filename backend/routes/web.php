@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -31,10 +32,20 @@ Route::middleware(['auth', 'active'])->group(function () {
         'index'
     ])->name('dashboard');
 
+    // ========================================
+    // PRODUCTS
+    // ========================================
+
     Route::get('/inventory/products', [
         ProductController::class,
         'index'
     ])->name('inventory.products.index');
+
+    // SKU preview for selected category
+    Route::get('/inventory/products/next-sku', [
+        ProductController::class,
+        'nextSku'
+    ])->name('inventory.products.next-sku');
 
     Route::post('/inventory/products', [
         ProductController::class,
@@ -56,10 +67,18 @@ Route::middleware(['auth', 'active'])->group(function () {
         'restore'
     ])->name('inventory.products.restore');
 
+    // ========================================
+    // LOGOUT
+    // ========================================
+
     Route::post('/logout', [
         AuthenticatedSessionController::class,
         'destroy'
     ])->name('logout');
+
+    // ========================================
+    // SUPERADMIN
+    // ========================================
 
     Route::middleware('superadmin')->group(function () {
 

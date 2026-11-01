@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Head, Link, router } from "@inertiajs/react";
@@ -8,6 +9,7 @@ import AddProductModal from "./components/AddProductModal.jsx";
 import ViewProductModal from "./components/ViewProductModal.jsx";
 import EditProductModal from "./components/EditProductModal.jsx";
 import ArchiveProductModal from "./components/ArchiveProductModal.jsx";
+import RestoreProductModal from "./components/RestoreProductModal.jsx";
 
 import "../../../../css/products.css";
 
@@ -26,6 +28,7 @@ export default function Index({
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [editingProduct, setEditingProduct] = useState(null);
     const [archivingProduct, setArchivingProduct] = useState(null);
+    const [restoringProduct, setRestoringProduct] = useState(null);
 
     const [actionMenu, setActionMenu] = useState(null);
     const [isFiltering, setIsFiltering] = useState(false);
@@ -310,25 +313,15 @@ export default function Index({
         setArchivingProduct(null);
     };
 
-    const handleRestoreProduct = (product) => {
+    const openRestoreModal = (product) => {
         if (!product.archived_at) return;
 
         closeActionMenu();
+        setRestoringProduct(product);
+    };
 
-        const confirmed = window.confirm(
-            `Are you sure you want to restore "${product.name}"?\n\n` +
-            "The product will return to the current catalog as Inactive."
-        );
-
-        if (!confirmed) return;
-
-        router.patch(
-            `/inventory/products/${product.id}/restore`,
-            {},
-            {
-                preserveScroll: true,
-            }
-        );
+    const closeRestoreModal = () => {
+        setRestoringProduct(null);
     };
 
     const getStockStatus = (quantity) => {
@@ -696,9 +689,7 @@ export default function Index({
                                     className="products-menu-item"
                                     role="menuitem"
                                     onClick={() =>
-                                        handleRestoreProduct(
-                                            actionMenu.product
-                                        )
+                                        openRestoreModal(actionMenu.product)
                                     }
                                 >
                                     Restore
@@ -732,6 +723,12 @@ export default function Index({
                 isOpen={archivingProduct !== null}
                 onClose={closeArchiveModal}
                 product={archivingProduct}
+            />
+
+            <RestoreProductModal
+                isOpen={restoringProduct !== null}
+                onClose={closeRestoreModal}
+                product={restoringProduct}
             />
         </InventoryLayout>
     );

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import { useForm } from "@inertiajs/react";
 
 import FormModal from "../../../../components/modals/FormModal.jsx";
@@ -17,6 +18,14 @@ export default function AddProductModal({
         useState(false);
 
     // ========================================
+    // SKU PREVIEW STATE
+    // ========================================
+
+    const [displayedSku, setDisplayedSku] = useState("");
+    const [isLoadingSku, setIsLoadingSku] = useState(false);
+    const [skuError, setSkuError] = useState("");
+
+    // ========================================
     // ADD PRODUCT FORM
     // ========================================
 
@@ -29,7 +38,6 @@ export default function AddProductModal({
         reset,
         clearErrors,
     } = useForm({
-        sku: "",
         name: "",
         category_id: "",
         description: "",
@@ -38,12 +46,91 @@ export default function AddProductModal({
     });
 
     // ========================================
+    // AUTOMATIC SKU PREVIEW
+    // ========================================
+
+    useEffect(() => {
+        if (!isOpen || !data.category_id) {
+            setDisplayedSku("");
+            setIsLoadingSku(false);
+            setSkuError("");
+            return;
+        }
+
+        const controller = new AbortController();
+
+        setDisplayedSku("");
+        setIsLoadingSku(true);
+        setSkuError("");
+
+        const fetchNextSku = async () => {
+            try {
+                const response = await fetch(
+                    `/inventory/products/next-sku?category_id=${encodeURIComponent(
+                        data.category_id
+                    )}`,
+                    {
+                        method: "GET",
+                        signal: controller.signal,
+                        credentials: "same-origin",
+                        headers: {
+                            Accept: "application/json",
+                        },
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Unable to generate the next SKU."
+                    );
+                }
+
+                const result = await response.json();
+
+                if (!controller.signal.aborted) {
+                    if (!result.sku) {
+                        throw new Error(
+                            "No SKU was returned by the server."
+                        );
+                    }
+
+                    setDisplayedSku(result.sku);
+                    setSkuError("");
+                }
+            } catch (error) {
+                if (!controller.signal.aborted) {
+                    setDisplayedSku("");
+                    setSkuError(error.message);
+                    console.error(
+                        "SKU preview error:",
+                        error
+                    );
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsLoadingSku(false);
+                }
+            }
+        };
+
+        fetchNextSku();
+
+        return () => {
+            controller.abort();
+        };
+    }, [isOpen, data.category_id]);
+
+    // ========================================
     // RESET FORM
     // ========================================
 
     const resetForm = () => {
         reset();
         clearErrors();
+
+        setDisplayedSku("");
+        setIsLoadingSku(false);
+        setSkuError("");
     };
 
     // ========================================
@@ -64,7 +151,9 @@ export default function AddProductModal({
     const handleSubmit = (event) => {
         event?.preventDefault();
 
-        if (processing) return;
+        if (processing || isLoadingSku || skuError) {
+            return;
+        }
 
         post("/inventory/products", {
             preserveScroll: true,
@@ -76,6 +165,20 @@ export default function AddProductModal({
             },
         });
     };
+
+    // ========================================
+    // SKU DISPLAY TEXT
+    // ========================================
+
+    const skuPlaceholder = isLoadingSku
+        ? "Generating SKU..."
+        : "Select a category";
+
+    const skuHelpText = isLoadingSku
+        ? "Checking the next available SKU..."
+        : displayedSku
+          ? "SKU generated automatically based on the selected category."
+          : "Select a category to generate an SKU.";
 
     // ========================================
     // RENDER
@@ -135,7 +238,10 @@ export default function AddProductModal({
                             maxLength={255}
                             value={data.name}
                             onChange={(event) =>
-                                setData("name", event.target.value)
+                                setData(
+                                    "name",
+                                    event.target.value
+                                )
                             }
                             aria-invalid={Boolean(errors.name)}
                         />
@@ -158,26 +264,30 @@ export default function AddProductModal({
                                 className="sc-form-label"
                             >
                                 SKU
-                                <span className="sc-form-required">
-                                    *
-                                </span>
                             </label>
 
                             <input
                                 id="product-sku"
                                 type="text"
                                 className="sc-form-input"
-                                placeholder="e.g. DRINK-001"
-                                maxLength={50}
-                                value={data.sku}
-                                onChange={(event) =>
-                                    setData(
-                                        "sku",
-                                        event.target.value
-                                    )
-                                }
-                                aria-invalid={Boolean(errors.sku)}
+                                placeholder={skuPlaceholder}
+                                value={displayedSku}
+                                readOnly
+                                aria-readonly="true"
+                                aria-invalid={Boolean(
+                                    skuError || errors.sku
+                                )}
                             />
+
+                            {skuError ? (
+                                <p className="sc-form-error">
+                                    {skuError}
+                                </p>
+                            ) : (
+                                <p className="sc-form-help">
+                                    {skuHelpText}
+                                </p>
+                            )}
 
                             {errors.sku && (
                                 <p className="sc-form-error">
@@ -194,6 +304,9 @@ export default function AddProductModal({
                                 className="sc-form-label"
                             >
                                 Category
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <select
@@ -211,7 +324,7 @@ export default function AddProductModal({
                                 )}
                             >
                                 <option value="">
-                                    Uncategorized
+                                    Select a category
                                 </option>
 
                                 {categories.map((item) => (
@@ -318,7 +431,9 @@ export default function AddProductModal({
                                         event.target.value
                                     )
                                 }
-                                aria-invalid={Boolean(errors.price)}
+                                aria-invalid={Boolean(
+                                    errors.price
+                                )}
                             />
                         </div>
 
@@ -361,7 +476,9 @@ export default function AddProductModal({
                         <select
                             id="product-status"
                             className="sc-form-select"
-                            value={data.is_active ? "1" : "0"}
+                            value={
+                                data.is_active ? "1" : "0"
+                            }
                             onChange={(event) =>
                                 setData(
                                     "is_active",
