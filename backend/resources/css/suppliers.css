@@ -1,0 +1,74 @@
+
+.suppliers-page {
+    width: 100%;
+    min-width: 0;
+}
+
+.suppliers-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.suppliers-table .suppliers-phone {
+    white-space: nowrap;
+}
+
+.suppliers-table .suppliers-email {
+    max-width: 200px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.suppliers-table .suppliers-address {
+    width: 180px;
+    max-width: 180px;
+    min-width: 140px;
+}
+
+.suppliers-address-text {
+    display: block;
+    width: 100%;
+    max-width: 180px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: default;
+}
+
+.suppliers-table th:last-child,
+.suppliers-table td:last-child {
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .suppliers-table .suppliers-email {
+        max-width: 160px;
+    }
+
+    .suppliers-table .suppliers-address {
+        width: 150px;
+        max-width: 150px;
+        min-width: 130px;
+    }
+
+    .suppliers-address-text {
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .suppliers-table .suppliers-email {
+        max-width: 120px;
+    }
+
+    .suppliers-table .suppliers-address {
+        width: 130px;
+        max-width: 130px;
+        min-width: 120px;
+    }
+
+    .suppliers-address-text {
+        max-width: 130px;
+    }
+}

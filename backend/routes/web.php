@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -5,6 +6,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\InventoryDashboardController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\SupplierController;
 
 Route::get('/', function () {
     return redirect('/login');
@@ -85,6 +87,32 @@ Route::middleware(['auth', 'active'])->group(function () {
         CategoryController::class,
         'restore'
     ])->name('inventory.categories.restore');
+
+    // Suppliers
+    Route::get('/inventory/suppliers', [
+        SupplierController::class,
+        'index'
+    ])->name('inventory.suppliers.index');
+
+    Route::post('/inventory/suppliers', [
+        SupplierController::class,
+        'store'
+    ])->name('inventory.suppliers.store');
+
+    Route::put('/inventory/suppliers/{supplier}', [
+        SupplierController::class,
+        'update'
+    ])->name('inventory.suppliers.update');
+
+    Route::patch('/inventory/suppliers/{supplier}/deactivate', [
+        SupplierController::class,
+        'deactivate'
+    ])->name('inventory.suppliers.deactivate');
+
+    Route::patch('/inventory/suppliers/{supplier}/reactivate', [
+        SupplierController::class,
+        'reactivate'
+    ])->name('inventory.suppliers.reactivate');
 
     // Logout
     Route::post('/logout', [

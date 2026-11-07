@@ -1,5 +1,27 @@
+
 import React from "react";
 import { Link, usePage } from "@inertiajs/react";
+
+import {
+    LayoutDashboard,
+    Package,
+    Tags,
+    Truck,
+    PackagePlus,
+    PackageMinus,
+    History,
+    ShoppingCart,
+    ClipboardList,
+    CreditCard,
+    ChartNoAxesColumnIncreasing,
+    Boxes,
+    ChartPie,
+    ChartNoAxesCombined,
+    Users,
+    ScrollText,
+    Settings,
+} from "lucide-react";
+
 import "../../css/sidebar.css";
 
 export default function Sidebar() {
@@ -15,6 +37,7 @@ export default function Sidebar() {
                 {
                     name: "Dashboard",
                     path: "/dashboard",
+                    icon: LayoutDashboard,
                 },
             ],
         },
@@ -24,14 +47,17 @@ export default function Sidebar() {
                 {
                     name: "Products",
                     path: "/inventory/products",
+                    icon: Package,
                 },
                 {
                     name: "Categories",
                     path: "/inventory/categories",
+                    icon: Tags,
                 },
                 {
                     name: "Suppliers",
                     path: "/inventory/suppliers",
+                    icon: Truck,
                 },
             ],
         },
@@ -41,14 +67,17 @@ export default function Sidebar() {
                 {
                     name: "Stock In",
                     path: "/inventory/stock-in",
+                    icon: PackagePlus,
                 },
                 {
                     name: "Stock Out",
                     path: "/inventory/stock-out",
+                    icon: PackageMinus,
                 },
                 {
                     name: "Stock History",
                     path: "/inventory/history",
+                    icon: History,
                 },
             ],
         },
@@ -58,18 +87,22 @@ export default function Sidebar() {
                 {
                     name: "Point of Sale",
                     path: "/pos",
+                    icon: ShoppingCart,
                 },
                 {
                     name: "Orders",
                     path: "/orders",
+                    icon: ClipboardList,
                 },
                 {
                     name: "Payments",
                     path: "/payments",
+                    icon: CreditCard,
                 },
                 {
                     name: "Sales",
                     path: "/sales",
+                    icon: ChartNoAxesColumnIncreasing,
                 },
             ],
         },
@@ -79,14 +112,17 @@ export default function Sidebar() {
                 {
                     name: "Inventory Reports",
                     path: "/inventory/reports",
+                    icon: Boxes,
                 },
                 {
                     name: "Sales Reports",
                     path: "/sales/reports",
+                    icon: ChartPie,
                 },
                 {
                     name: "Overall Analytics",
                     path: "/analytics",
+                    icon: ChartNoAxesCombined,
                     superadminOnly: true,
                 },
             ],
@@ -97,23 +133,25 @@ export default function Sidebar() {
                 {
                     name: "User Management",
                     path: "/users",
+                    icon: Users,
                     superadminOnly: true,
                 },
                 {
                     name: "Activity Logs",
                     path: "/activity-logs",
+                    icon: ScrollText,
                     superadminOnly: true,
                 },
                 {
                     name: "System Settings",
                     path: "/settings",
+                    icon: Settings,
                     superadminOnly: true,
                 },
             ],
         },
     ];
 
-    // Filter navigation based on user role.
     const visibleMenuItems = menuItems
         .map((group) => ({
             ...group,
@@ -123,7 +161,6 @@ export default function Sidebar() {
         }))
         .filter((group) => group.items.length > 0);
 
-    // Check active navigation.
     const isActive = (path) => {
         const currentPath = url.split("?")[0];
 
@@ -132,10 +169,7 @@ export default function Sidebar() {
 
     return (
         <aside className="sc-sidebar">
-
-            {/* Sidebar Header */}
             <div className="sc-sidebar-header">
-
                 <img
                     src="/images/school-logo.jpg"
                     alt="Carmen Denia National High School"
@@ -146,10 +180,8 @@ export default function Sidebar() {
                     <h2>School Canteen</h2>
                     <p>Management System</p>
                 </div>
-
             </div>
 
-            {/* Sidebar Navigation */}
             <nav
                 className="sc-sidebar-navigation"
                 aria-label="Main navigation"
@@ -165,6 +197,7 @@ export default function Sidebar() {
 
                         {group.items.map((item) => {
                             const active = isActive(item.path);
+                            const Icon = item.icon;
 
                             return (
                                 <Link
@@ -177,6 +210,13 @@ export default function Sidebar() {
                                         active ? "page" : undefined
                                     }
                                 >
+                                    <Icon
+                                        size={17}
+                                        strokeWidth={1.8}
+                                        className="sc-sidebar-icon"
+                                        aria-hidden="true"
+                                    />
+
                                     <span>{item.name}</span>
                                 </Link>
                             );
@@ -184,7 +224,6 @@ export default function Sidebar() {
                     </div>
                 ))}
             </nav>
-
         </aside>
     );
 }
