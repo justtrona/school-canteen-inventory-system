@@ -1,0 +1,41 @@
+
+/* ========================================
+   CATEGORIES PAGE
+======================================== */
+
+.categories-page {
+    width: 100%;
+    min-width: 0;
+}
+
+/* ========================================
+   CATEGORIES TABLE
+======================================== */
+
+.categories-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.categories-description {
+    max-width: 360px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 768px) {
+    .categories-description {
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .categories-description {
+        max-width: 140px;
+    }
+}

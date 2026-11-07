@@ -15,10 +15,6 @@ use Inertia\Response;
 
 class ProductController extends Controller
 {
-    // ========================================
-    // PRODUCT LIST
-    // ========================================
-
     public function index(Request $request): Response
     {
         $search = trim((string) $request->query('search', ''));
@@ -51,14 +47,13 @@ class ProductController extends Controller
             ->withQueryString();
 
         $categories = Category::query()
+            ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'sku_prefix']);
 
         return Inertia::render('Inventory/Products/Index', [
             'products' => $products,
-
             'categories' => $categories,
-
             'filters' => [
                 'search' => $search,
                 'category' => $category,
@@ -67,12 +62,15 @@ class ProductController extends Controller
         ]);
     }
 
-    // ========================================
-    // SHARED SKU GENERATOR
-    // ========================================
-
     private function generateNextSku(Category $category): string
     {
+        if (!$category->is_active) {
+            throw ValidationException::withMessages([
+                'category_id' =>
+                    'Please select an active category.',
+            ]);
+        }
+
         $prefix = strtoupper(
             trim((string) $category->sku_prefix)
         );
@@ -83,9 +81,6 @@ class ProductController extends Controller
                     'This category does not have an SKU prefix yet.',
             ]);
         }
-
-        // Include all products, even archived products.
-        // Do not reuse existing SKU numbers.
 
         $existingSkus = Product::query()
             ->where('sku', 'like', $prefix . '-%')
@@ -119,10 +114,6 @@ class ProductController extends Controller
             );
     }
 
-    // ========================================
-    // PREVIEW NEXT SKU
-    // ========================================
-
     public function nextSku(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -146,10 +137,6 @@ class ProductController extends Controller
         ]);
     }
 
-    // ========================================
-    // CREATE PRODUCT
-    // ========================================
-
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -158,26 +145,22 @@ class ProductController extends Controller
                 'string',
                 'max:255',
             ],
-
             'category_id' => [
                 'required',
                 'integer',
                 Rule::exists('categories', 'id')
                     ->where('is_active', true),
             ],
-
             'description' => [
                 'nullable',
                 'string',
             ],
-
             'price' => [
                 'required',
                 'numeric',
                 'min:0',
                 'max:99999999.99',
             ],
-
             'is_active' => [
                 'required',
                 'boolean',
@@ -185,10 +168,6 @@ class ProductController extends Controller
         ]);
 
         DB::transaction(function () use ($validated) {
-
-            // Lock the category during SKU assignment
-            // to serialize product creation per category.
-
             $category = Category::query()
                 ->whereKey($validated['category_id'])
                 ->where('is_active', true)
@@ -201,9 +180,6 @@ class ProductController extends Controller
                         'Please select an active category.',
                 ]);
             }
-
-            // Generate the final SKU when saving.
-            // Do not trust the frontend preview.
 
             $sku = $this->generateNextSku($category);
 
@@ -219,7 +195,6 @@ class ProductController extends Controller
             $product->is_active = $validated['is_active'];
 
             $product->save();
-
         }, 3);
 
         return redirect()
@@ -229,10 +204,6 @@ class ProductController extends Controller
                 'Product added successfully.'
             );
     }
-
-    // ========================================
-    // UPDATE PRODUCT
-    // ========================================
 
     public function update(
         Request $request,
@@ -244,37 +215,61 @@ class ProductController extends Controller
                 'string',
                 'max:255',
             ],
-
             'category_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('categories', 'id'),
             ],
-
             'description' => [
                 'nullable',
                 'string',
             ],
-
             'price' => [
                 'required',
                 'numeric',
                 'min:0',
                 'max:99999999.99',
             ],
-
             'is_active' => [
                 'required',
                 'boolean',
             ],
         ]);
 
-        // SKU is permanent and cannot be edited.
-        // Changing the category does not change the SKU.
+        $newCategoryId = $validated['category_id'] ?? null;
+
+        if ($newCategoryId !== null) {
+            $isCurrentCategory =
+                (int) $newCategoryId ===
+                (int) $product->category_id;
+
+            if (!$isCurrentCategory) {
+                $activeCategoryExists = Category::query()
+                    ->whereKey($newCategoryId)
+                    ->where('is_active', true)
+                    ->exists();
+
+                if (!$activeCategoryExists) {
+                    throw ValidationException::withMessages([
+                        'category_id' =>
+                            'Please select an active category.',
+                    ]);
+                }
+            } else {
+                $categoryExists = Category::query()
+                    ->whereKey($newCategoryId)
+                    ->exists();
+
+                if (!$categoryExists) {
+                    throw ValidationException::withMessages([
+                        'category_id' =>
+                            'The selected category no longer exists.',
+                    ]);
+                }
+            }
+        }
 
         $product->name = trim($validated['name']);
-        $product->category_id =
-            $validated['category_id'] ?? null;
+        $product->category_id = $newCategoryId;
         $product->description =
             $validated['description'] ?? null;
         $product->price = $validated['price'];
@@ -289,10 +284,6 @@ class ProductController extends Controller
                 'Product updated successfully.'
             );
     }
-
-    // ========================================
-    // ARCHIVE PRODUCT
-    // ========================================
 
     public function archive(
         Product $product
@@ -309,8 +300,6 @@ class ProductController extends Controller
             'is_active' => false,
         ])->save();
 
-        // Archived products retain their original SKUs.
-
         return redirect()
             ->route('inventory.products.index')
             ->with(
@@ -318,10 +307,6 @@ class ProductController extends Controller
                 'Product archived successfully.'
             );
     }
-
-    // ========================================
-    // RESTORE PRODUCT
-    // ========================================
 
     public function restore(
         Product $product
@@ -337,9 +322,6 @@ class ProductController extends Controller
             'archived_at' => null,
             'is_active' => false,
         ])->save();
-
-        // Restored products keep their original SKUs
-        // and return to the catalog as Inactive.
 
         return redirect()
             ->route(

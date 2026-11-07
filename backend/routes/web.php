@@ -1,18 +1,16 @@
-
 <?php
 
 use Illuminate\Support\Facades\Route;
-
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\InventoryDashboardController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\CategoryController;
 
 Route::get('/', function () {
     return redirect('/login');
 });
 
 Route::middleware('guest')->group(function () {
-
     Route::get('/login', [
         AuthenticatedSessionController::class,
         'create'
@@ -22,7 +20,6 @@ Route::middleware('guest')->group(function () {
         AuthenticatedSessionController::class,
         'store'
     ]);
-
 });
 
 Route::middleware(['auth', 'active'])->group(function () {
@@ -32,16 +29,12 @@ Route::middleware(['auth', 'active'])->group(function () {
         'index'
     ])->name('dashboard');
 
-    // ========================================
-    // PRODUCTS
-    // ========================================
-
+    // Products
     Route::get('/inventory/products', [
         ProductController::class,
         'index'
     ])->name('inventory.products.index');
 
-    // SKU preview for selected category
     Route::get('/inventory/products/next-sku', [
         ProductController::class,
         'nextSku'
@@ -67,27 +60,44 @@ Route::middleware(['auth', 'active'])->group(function () {
         'restore'
     ])->name('inventory.products.restore');
 
-    // ========================================
-    // LOGOUT
-    // ========================================
+    // Categories
+    Route::get('/inventory/categories', [
+        CategoryController::class,
+        'index'
+    ])->name('inventory.categories.index');
 
+    Route::post('/inventory/categories', [
+        CategoryController::class,
+        'store'
+    ])->name('inventory.categories.store');
+
+    Route::put('/inventory/categories/{category}', [
+        CategoryController::class,
+        'update'
+    ])->name('inventory.categories.update');
+
+    Route::patch('/inventory/categories/{category}/archive', [
+        CategoryController::class,
+        'archive'
+    ])->name('inventory.categories.archive');
+
+    Route::patch('/inventory/categories/{category}/restore', [
+        CategoryController::class,
+        'restore'
+    ])->name('inventory.categories.restore');
+
+    // Logout
     Route::post('/logout', [
         AuthenticatedSessionController::class,
         'destroy'
     ])->name('logout');
 
-    // ========================================
-    // SUPERADMIN
-    // ========================================
-
+    // Superadmin
     Route::middleware('superadmin')->group(function () {
-
         Route::get('/superadmin/test', function () {
             return response()->json([
                 'message' => 'Superadmin access granted.',
             ]);
         })->name('superadmin.test');
-
     });
-
 });
