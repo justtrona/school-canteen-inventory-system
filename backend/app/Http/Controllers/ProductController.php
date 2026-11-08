@@ -15,6 +15,10 @@ use Inertia\Response;
 
 class ProductController extends Controller
 {
+    // ========================================
+    // PRODUCT LIST
+    // ========================================
+
     public function index(Request $request): Response
     {
         $search = trim((string) $request->query('search', ''));
@@ -59,8 +63,13 @@ class ProductController extends Controller
                 'category' => $category,
                 'status' => $status,
             ],
+            'units' => Product::UNITS,
         ]);
     }
+
+    // ========================================
+    // SKU GENERATION
+    // ========================================
 
     private function generateNextSku(Category $category): string
     {
@@ -114,6 +123,10 @@ class ProductController extends Controller
             );
     }
 
+    // ========================================
+    // NEXT SKU PREVIEW
+    // ========================================
+
     public function nextSku(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -130,44 +143,121 @@ class ProductController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $sku = $this->generateNextSku($category);
-
         return response()->json([
-            'sku' => $sku,
+            'sku' => $this->generateNextSku($category),
         ]);
     }
 
+    // ========================================
+    // STORE PRODUCT
+    // ========================================
+
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'name' => trim(
+                (string) $request->input('name', '')
+            ),
+
+            'description' => trim(
+                (string) $request->input('description', '')
+            ) ?: null,
+        ]);
+
         $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
+                'min:3',
                 'max:255',
             ],
+
             'category_id' => [
                 'required',
                 'integer',
                 Rule::exists('categories', 'id')
                     ->where('is_active', true),
             ],
+
             'description' => [
                 'nullable',
                 'string',
+                'max:5000',
             ],
+
             'price' => [
                 'required',
                 'numeric',
                 'min:0',
                 'max:99999999.99',
+                'decimal:0,2',
             ],
+
+            'unit_of_measure' => [
+                'required',
+                'string',
+                Rule::in(Product::UNITS),
+            ],
+
+            'reorder_level' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:999999999.999',
+                'decimal:0,3',
+            ],
+
             'is_active' => [
                 'required',
                 'boolean',
             ],
+        ], [
+            'name.required' =>
+                'Product name is required.',
+
+            'name.min' =>
+                'Product name must have at least 3 characters.',
+
+            'category_id.required' =>
+                'Please select a product category.',
+
+            'category_id.exists' =>
+                'Please select an active category.',
+
+            'price.required' =>
+                'Product price is required.',
+
+            'price.numeric' =>
+                'Enter a valid product price.',
+
+            'price.decimal' =>
+                'Price can have up to 2 decimal places.',
+
+            'unit_of_measure.required' =>
+                'Please select a unit of measurement.',
+
+            'unit_of_measure.in' =>
+                'The selected unit of measurement is invalid.',
+
+            'reorder_level.required' =>
+                'Reorder level is required.',
+
+            'reorder_level.numeric' =>
+                'Reorder level must be a valid number.',
+
+            'reorder_level.min' =>
+                'Reorder level cannot be negative.',
+
+            'reorder_level.decimal' =>
+                'Reorder level can have up to 3 decimal places.',
+
+            'is_active.required' =>
+                'Please select a product status.',
         ]);
 
         DB::transaction(function () use ($validated) {
+
+            // Lock category while generating SKU.
             $category = Category::query()
                 ->whereKey($validated['category_id'])
                 ->where('is_active', true)
@@ -186,15 +276,28 @@ class ProductController extends Controller
             $product = new Product();
 
             $product->sku = $sku;
-            $product->name = trim($validated['name']);
+            $product->name = $validated['name'];
             $product->category_id = $category->id;
+
             $product->description =
                 $validated['description'] ?? null;
+
             $product->price = $validated['price'];
+
+            // Inventory measurement settings.
+            $product->unit_of_measure =
+                $validated['unit_of_measure'];
+
+            $product->reorder_level =
+                $validated['reorder_level'];
+
+            // Every new product starts with zero stock.
             $product->quantity = 0;
+
             $product->is_active = $validated['is_active'];
 
             $product->save();
+
         }, 3);
 
         return redirect()
@@ -205,77 +308,221 @@ class ProductController extends Controller
             );
     }
 
+    // ========================================
+    // UPDATE PRODUCT
+    // ========================================
+
     public function update(
         Request $request,
         Product $product
     ): RedirectResponse {
+
+        $request->merge([
+            'name' => trim(
+                (string) $request->input('name', '')
+            ),
+
+            'description' => trim(
+                (string) $request->input('description', '')
+            ) ?: null,
+        ]);
+
         $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
+                'min:3',
                 'max:255',
             ],
+
             'category_id' => [
+                'sometimes',
                 'nullable',
                 'integer',
             ],
+
             'description' => [
                 'nullable',
                 'string',
+                'max:5000',
             ],
+
             'price' => [
                 'required',
                 'numeric',
                 'min:0',
                 'max:99999999.99',
+                'decimal:0,2',
             ],
+
+            'unit_of_measure' => [
+                'required',
+                'string',
+                Rule::in(Product::UNITS),
+            ],
+
+            'reorder_level' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:999999999.999',
+                'decimal:0,3',
+            ],
+
             'is_active' => [
                 'required',
                 'boolean',
             ],
+        ], [
+            'name.required' =>
+                'Product name is required.',
+
+            'name.min' =>
+                'Product name must have at least 3 characters.',
+
+            'category_id.integer' =>
+                'Please select a valid category.',
+
+            'price.required' =>
+                'Product price is required.',
+
+            'price.numeric' =>
+                'Enter a valid product price.',
+
+            'price.decimal' =>
+                'Price can have up to 2 decimal places.',
+
+            'unit_of_measure.required' =>
+                'Please select a unit of measurement.',
+
+            'unit_of_measure.in' =>
+                'The selected unit of measurement is invalid.',
+
+            'reorder_level.required' =>
+                'Reorder level is required.',
+
+            'reorder_level.numeric' =>
+                'Reorder level must be a valid number.',
+
+            'reorder_level.min' =>
+                'Reorder level cannot be negative.',
+
+            'reorder_level.decimal' =>
+                'Reorder level can have up to 3 decimal places.',
         ]);
 
-        $newCategoryId = $validated['category_id'] ?? null;
+        DB::transaction(function () use (
+            $validated,
+            $product
+        ) {
 
-        if ($newCategoryId !== null) {
-            $isCurrentCategory =
-                (int) $newCategoryId ===
-                (int) $product->category_id;
+            // Lock the product before checking its inventory history.
+            $lockedProduct = Product::query()
+                ->whereKey($product->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            if (!$isCurrentCategory) {
-                $activeCategoryExists = Category::query()
-                    ->whereKey($newCategoryId)
-                    ->where('is_active', true)
-                    ->exists();
+            // ========================================
+            // CATEGORY VALIDATION
+            // ========================================
 
-                if (!$activeCategoryExists) {
-                    throw ValidationException::withMessages([
-                        'category_id' =>
-                            'Please select an active category.',
-                    ]);
+            if (array_key_exists('category_id', $validated)) {
+
+                $newCategoryId = $validated['category_id'];
+
+                if ($newCategoryId !== null) {
+
+                    $isCurrentCategory =
+                        (int) $newCategoryId ===
+                        (int) $lockedProduct->category_id;
+
+                    if (!$isCurrentCategory) {
+
+                        $activeCategoryExists = Category::query()
+                            ->whereKey($newCategoryId)
+                            ->where('is_active', true)
+                            ->exists();
+
+                        if (!$activeCategoryExists) {
+                            throw ValidationException::withMessages([
+                                'category_id' =>
+                                    'Please select an active category.',
+                            ]);
+                        }
+
+                    } else {
+
+                        $categoryExists = Category::query()
+                            ->whereKey($newCategoryId)
+                            ->exists();
+
+                        if (!$categoryExists) {
+                            throw ValidationException::withMessages([
+                                'category_id' =>
+                                    'The selected category no longer exists.',
+                            ]);
+                        }
+                    }
                 }
-            } else {
-                $categoryExists = Category::query()
-                    ->whereKey($newCategoryId)
-                    ->exists();
+            }
 
-                if (!$categoryExists) {
+            // ========================================
+            // UNIT OF MEASUREMENT PROTECTION
+            // ========================================
+
+            $unitChanged =
+                $validated['unit_of_measure'] !==
+                $lockedProduct->unit_of_measure;
+
+            if ($unitChanged) {
+
+                $hasExistingStock =
+                    (float) $lockedProduct->quantity > 0;
+
+                $hasStockHistory =
+                    $lockedProduct->stockMovements()->exists();
+
+                if ($hasExistingStock || $hasStockHistory) {
                     throw ValidationException::withMessages([
-                        'category_id' =>
-                            'The selected category no longer exists.',
+                        'unit_of_measure' =>
+                            'The unit of measurement cannot be changed because this product already has inventory records. Create a new product with the correct unit instead.',
                     ]);
                 }
             }
-        }
 
-        $product->name = trim($validated['name']);
-        $product->category_id = $newCategoryId;
-        $product->description =
-            $validated['description'] ?? null;
-        $product->price = $validated['price'];
-        $product->is_active = $validated['is_active'];
+            // ========================================
+            // SAVE PRODUCT INFORMATION
+            // ========================================
 
-        $product->save();
+            $lockedProduct->name = $validated['name'];
+
+            // Only change category when supplied.
+            if (array_key_exists('category_id', $validated)) {
+                $lockedProduct->category_id =
+                    $validated['category_id'];
+            }
+
+            $lockedProduct->description =
+                $validated['description'] ?? null;
+
+            $lockedProduct->price =
+                $validated['price'];
+
+            $lockedProduct->unit_of_measure =
+                $validated['unit_of_measure'];
+
+            $lockedProduct->reorder_level =
+                $validated['reorder_level'];
+
+            $lockedProduct->is_active =
+                $validated['is_active'];
+
+            // Quantity is intentionally not updated here.
+            // Stock changes must go through inventory transactions.
+
+            $lockedProduct->save();
+
+        }, 3);
 
         return redirect()
             ->route('inventory.products.index')
@@ -285,9 +532,14 @@ class ProductController extends Controller
             );
     }
 
+    // ========================================
+    // ARCHIVE PRODUCT
+    // ========================================
+
     public function archive(
         Product $product
     ): RedirectResponse {
+
         if ($product->archived_at !== null) {
             return back()->withErrors([
                 'archive' =>
@@ -308,9 +560,14 @@ class ProductController extends Controller
             );
     }
 
+    // ========================================
+    // RESTORE PRODUCT
+    // ========================================
+
     public function restore(
         Product $product
     ): RedirectResponse {
+
         if ($product->archived_at === null) {
             return back()->withErrors([
                 'restore' =>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class StockMovement extends Model
 {
@@ -22,22 +23,25 @@ class StockMovement extends Model
     protected function casts(): array
     {
         return [
-            'quantity_change' => 'integer',
-            'quantity_before' => 'integer',
-            'quantity_after' => 'integer',
+            'quantity_change' => 'decimal:3',
+            'quantity_before' => 'decimal:3',
+            'quantity_after' => 'decimal:3',
             'reference_id' => 'integer',
         ];
     }
 
-    // Product affected by the inventory movement.
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
     }
 
-    // Admin or Superadmin responsible for the movement.
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function stockInReceipt(): HasOne
+    {
+        return $this->hasOne(StockInReceipt::class);
     }
 }

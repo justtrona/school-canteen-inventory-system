@@ -13,22 +13,100 @@ import RestoreProductModal from "./components/RestoreProductModal.jsx";
 
 import "../../../../css/products.css";
 
+// ========================================
+// QUANTITY FORMATTING
+// ========================================
+
+const COUNT_UNITS = ["pcs", "bottle", "pack", "box"];
+
+const formatQuantity = (quantity, unit = "pcs") => {
+    const value = Number(quantity ?? 0);
+
+    if (!Number.isFinite(value)) return "—";
+
+    return value.toLocaleString("en-PH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: COUNT_UNITS.includes(unit) ? 0 : 3,
+    });
+};
+
+// ========================================
+// STOCK STATUS
+// ========================================
+
+const getStockStatus = (quantity, reorderLevel) => {
+    const stockQuantity = Number(quantity ?? 0);
+    const threshold = Number(reorderLevel ?? 0);
+
+    if (stockQuantity <= 0) {
+        return {
+            label: "Out of Stock",
+            className: "out",
+        };
+    }
+
+    if (threshold > 0 && stockQuantity <= threshold) {
+        return {
+            label: "Low Stock",
+            className: "low",
+        };
+    }
+
+    return {
+        label: "In Stock",
+        className: "available",
+    };
+};
+
+// ========================================
+// PRICE FORMATTING
+// ========================================
+
+const formatPrice = (price) => {
+    return Number(price ?? 0).toLocaleString("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+};
+
+// ========================================
+// PRODUCTS PAGE
+// ========================================
+
 export default function Index({
     products,
     categories = [],
     filters = {},
 }) {
+    // ========================================
+    // FILTER STATES
+    // ========================================
+
     const [search, setSearch] = useState(filters.search ?? "");
+
     const [category, setCategory] = useState(
         String(filters.category ?? "")
     );
-    const [status, setStatus] = useState(filters.status ?? "active");
+
+    const [status, setStatus] = useState(
+        filters.status ?? "active"
+    );
+
+    // ========================================
+    // MODAL STATES
+    // ========================================
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [editingProduct, setEditingProduct] = useState(null);
     const [archivingProduct, setArchivingProduct] = useState(null);
     const [restoringProduct, setRestoringProduct] = useState(null);
+
+    // ========================================
+    // ACTION MENU STATES
+    // ========================================
 
     const [actionMenu, setActionMenu] = useState(null);
     const [isFiltering, setIsFiltering] = useState(false);
@@ -61,9 +139,17 @@ export default function Index({
         category !== "" ||
         status !== "active";
 
+    // ========================================
+    // CLOSE ACTION MENU
+    // ========================================
+
     const closeActionMenu = () => {
         setActionMenu(null);
     };
+
+    // ========================================
+    // TOGGLE ACTION MENU
+    // ========================================
 
     const toggleActionMenu = (event, product) => {
         if (actionMenu?.product.id === product.id) {
@@ -102,6 +188,10 @@ export default function Index({
         });
     };
 
+    // ========================================
+    // ACTION MENU EVENT LISTENERS
+    // ========================================
+
     useEffect(() => {
         if (!actionMenu) return;
 
@@ -130,21 +220,54 @@ export default function Index({
             closeActionMenu();
         };
 
-        document.addEventListener("pointerdown", handleOutsideClick);
-        document.addEventListener("keydown", handleEscape);
-        window.addEventListener("scroll", handleScroll, true);
-        window.addEventListener("resize", handleScroll);
+        document.addEventListener(
+            "pointerdown",
+            handleOutsideClick
+        );
+
+        document.addEventListener(
+            "keydown",
+            handleEscape
+        );
+
+        window.addEventListener(
+            "scroll",
+            handleScroll,
+            true
+        );
+
+        window.addEventListener(
+            "resize",
+            handleScroll
+        );
 
         return () => {
             document.removeEventListener(
                 "pointerdown",
                 handleOutsideClick
             );
-            document.removeEventListener("keydown", handleEscape);
-            window.removeEventListener("scroll", handleScroll, true);
-            window.removeEventListener("resize", handleScroll);
+
+            document.removeEventListener(
+                "keydown",
+                handleEscape
+            );
+
+            window.removeEventListener(
+                "scroll",
+                handleScroll,
+                true
+            );
+
+            window.removeEventListener(
+                "resize",
+                handleScroll
+            );
         };
     }, [actionMenu]);
+
+    // ========================================
+    // SYNC APPLIED FILTERS
+    // ========================================
 
     useEffect(() => {
         const nextAppliedFilters = {
@@ -164,7 +287,15 @@ export default function Index({
         ) {
             setIsFiltering(false);
         }
-    }, [filters.search, filters.category, filters.status]);
+    }, [
+        filters.search,
+        filters.category,
+        filters.status,
+    ]);
+
+    // ========================================
+    // CLEAR FILTER TIMER
+    // ========================================
 
     useEffect(() => {
         return () => {
@@ -173,6 +304,10 @@ export default function Index({
             }
         };
     }, []);
+
+    // ========================================
+    // REQUEST FILTERS
+    // ========================================
 
     const requestFilters = (nextFilters, delay = 0) => {
         if (filterTimerRef.current) {
@@ -213,7 +348,10 @@ export default function Index({
                     replace: true,
 
                     onFinish: () => {
-                        if (requestId === filterRequestRef.current) {
+                        if (
+                            requestId ===
+                            filterRequestRef.current
+                        ) {
                             setIsFiltering(false);
                         }
                     },
@@ -221,6 +359,10 @@ export default function Index({
             );
         }, delay);
     };
+
+    // ========================================
+    // SEARCH
+    // ========================================
 
     const handleSearchChange = (event) => {
         const nextSearch = event.target.value;
@@ -237,6 +379,10 @@ export default function Index({
         );
     };
 
+    // ========================================
+    // CATEGORY FILTER
+    // ========================================
+
     const handleCategoryChange = (event) => {
         const nextCategory = event.target.value;
 
@@ -248,6 +394,10 @@ export default function Index({
             status,
         });
     };
+
+    // ========================================
+    // STATUS FILTER
+    // ========================================
 
     const handleStatusChange = (event) => {
         const nextStatus = event.target.value;
@@ -261,6 +411,10 @@ export default function Index({
         });
     };
 
+    // ========================================
+    // RESET FILTERS
+    // ========================================
+
     const resetFilters = () => {
         setSearch("");
         setCategory("");
@@ -273,6 +427,10 @@ export default function Index({
         });
     };
 
+    // ========================================
+    // ADD MODAL
+    // ========================================
+
     const openAddModal = () => {
         closeActionMenu();
         setIsAddModalOpen(true);
@@ -282,6 +440,10 @@ export default function Index({
         setIsAddModalOpen(false);
     };
 
+    // ========================================
+    // VIEW MODAL
+    // ========================================
+
     const openViewModal = (product) => {
         closeActionMenu();
         setSelectedProduct(product);
@@ -290,6 +452,10 @@ export default function Index({
     const closeViewModal = () => {
         setSelectedProduct(null);
     };
+
+    // ========================================
+    // EDIT MODAL
+    // ========================================
 
     const openEditModal = (product) => {
         if (product.archived_at) return;
@@ -302,6 +468,10 @@ export default function Index({
         setEditingProduct(null);
     };
 
+    // ========================================
+    // ARCHIVE MODAL
+    // ========================================
+
     const openArchiveModal = (product) => {
         if (product.archived_at) return;
 
@@ -312,6 +482,10 @@ export default function Index({
     const closeArchiveModal = () => {
         setArchivingProduct(null);
     };
+
+    // ========================================
+    // RESTORE MODAL
+    // ========================================
 
     const openRestoreModal = (product) => {
         if (!product.archived_at) return;
@@ -324,44 +498,23 @@ export default function Index({
         setRestoringProduct(null);
     };
 
-    const getStockStatus = (quantity) => {
-        const stockQuantity = Number(quantity ?? 0);
-
-        if (stockQuantity <= 0) {
-            return {
-                label: "Out of Stock",
-                className: "out",
-            };
-        }
-
-        if (stockQuantity <= 10) {
-            return {
-                label: "Low Stock",
-                className: "low",
-            };
-        }
-
-        return {
-            label: "In Stock",
-            className: "available",
-        };
-    };
-
-    const formatPrice = (price) => {
-        return Number(price ?? 0).toLocaleString("en-PH", {
-            style: "currency",
-            currency: "PHP",
-        });
-    };
+    // ========================================
+    // RENDER
+    // ========================================
 
     return (
         <InventoryLayout>
             <Head title="Products" />
 
             <div className="products-page">
+                {/* ========================================
+                    PAGE HEADER
+                ======================================== */}
+
                 <div className="products-page-header">
                     <div>
                         <h1>Products</h1>
+
                         <p>
                             Manage products and monitor their current
                             stock levels.
@@ -377,8 +530,18 @@ export default function Index({
                     </button>
                 </div>
 
+                {/* ========================================
+                    PRODUCTS PANEL
+                ======================================== */}
+
                 <section className="products-panel">
+                    {/* ========================================
+                        FILTERS
+                    ======================================== */}
+
                     <div className="products-filters">
+                        {/* SEARCH */}
+
                         <div className="products-search-field">
                             <svg
                                 width="18"
@@ -391,7 +554,12 @@ export default function Index({
                                 strokeLinejoin="round"
                                 aria-hidden="true"
                             >
-                                <circle cx="11" cy="11" r="7" />
+                                <circle
+                                    cx="11"
+                                    cy="11"
+                                    r="7"
+                                />
+
                                 <path d="m20 20-4-4" />
                             </svg>
 
@@ -404,13 +572,17 @@ export default function Index({
                             />
                         </div>
 
+                        {/* CATEGORY FILTER */}
+
                         <div className="products-filter-select">
                             <select
                                 value={category}
                                 onChange={handleCategoryChange}
                                 aria-label="Filter by category"
                             >
-                                <option value="">All Categories</option>
+                                <option value="">
+                                    All Categories
+                                </option>
 
                                 {categories.map((item) => (
                                     <option
@@ -422,6 +594,8 @@ export default function Index({
                                 ))}
                             </select>
                         </div>
+
+                        {/* STATUS FILTER */}
 
                         <div className="products-filter-select products-status-select">
                             <select
@@ -438,6 +612,8 @@ export default function Index({
                                 </option>
                             </select>
                         </div>
+
+                        {/* FILTER ACTIONS */}
 
                         <div className="products-filter-actions">
                             {isFiltering && (
@@ -461,6 +637,10 @@ export default function Index({
                         </div>
                     </div>
 
+                    {/* ========================================
+                        PRODUCTS TABLE
+                    ======================================== */}
+
                     <div className="products-table-wrapper">
                         <table className="products-table">
                             <thead>
@@ -479,9 +659,24 @@ export default function Index({
                             <tbody>
                                 {products.data.length > 0 ? (
                                     products.data.map((product) => {
+                                        // ========================================
+                                        // PRODUCT STOCK DETAILS
+                                        // ========================================
+
                                         const stock = getStockStatus(
-                                            product.quantity
+                                            product.quantity,
+                                            product.reorder_level
                                         );
+
+                                        const unit =
+                                            product.unit_of_measure ??
+                                            "pcs";
+
+                                        const formattedQuantity =
+                                            formatQuantity(
+                                                product.quantity,
+                                                unit
+                                            );
 
                                         const isArchived = Boolean(
                                             product.archived_at
@@ -489,18 +684,26 @@ export default function Index({
 
                                         return (
                                             <tr key={product.id}>
+                                                {/* SKU */}
+
                                                 <td className="products-sku">
                                                     {product.sku}
                                                 </td>
+
+                                                {/* PRODUCT NAME */}
 
                                                 <td className="products-name">
                                                     {product.name}
                                                 </td>
 
+                                                {/* CATEGORY */}
+
                                                 <td>
                                                     {product.category?.name ??
                                                         "Uncategorized"}
                                                 </td>
+
+                                                {/* SELLING PRICE */}
 
                                                 <td>
                                                     {formatPrice(
@@ -508,9 +711,14 @@ export default function Index({
                                                     )}
                                                 </td>
 
+                                                {/* QUANTITY WITH UNIT */}
+
                                                 <td>
-                                                    {product.quantity}
+                                                    {formattedQuantity}{" "}
+                                                    {unit}
                                                 </td>
+
+                                                {/* STOCK STATUS */}
 
                                                 <td>
                                                     <span
@@ -520,6 +728,8 @@ export default function Index({
                                                     </span>
                                                 </td>
 
+                                                {/* PRODUCT STATUS */}
+
                                                 <td>
                                                     {isArchived
                                                         ? "Archived"
@@ -527,6 +737,8 @@ export default function Index({
                                                           ? "Active"
                                                           : "Inactive"}
                                                 </td>
+
+                                                {/* ACTIONS */}
 
                                                 <td>
                                                     <button
@@ -558,11 +770,13 @@ export default function Index({
                                                                 cy="5"
                                                                 r="1.8"
                                                             />
+
                                                             <circle
                                                                 cx="12"
                                                                 cy="12"
                                                                 r="1.8"
                                                             />
+
                                                             <circle
                                                                 cx="12"
                                                                 cy="19"
@@ -589,6 +803,10 @@ export default function Index({
                             </tbody>
                         </table>
                     </div>
+
+                    {/* ========================================
+                        PAGINATION
+                    ======================================== */}
 
                     <div className="products-pagination">
                         <span>
@@ -629,6 +847,10 @@ export default function Index({
                 </section>
             </div>
 
+            {/* ========================================
+                PRODUCT ACTION MENU
+            ======================================== */}
+
             {actionMenu &&
                 createPortal(
                     <div
@@ -641,6 +863,8 @@ export default function Index({
                             left: actionMenu.left,
                         }}
                     >
+                        {/* VIEW */}
+
                         <button
                             type="button"
                             className="products-menu-item"
@@ -652,6 +876,8 @@ export default function Index({
                             View
                         </button>
 
+                        {/* EDIT AND ARCHIVE */}
+
                         {!actionMenu.product.archived_at && (
                             <>
                                 <button
@@ -659,7 +885,9 @@ export default function Index({
                                     className="products-menu-item"
                                     role="menuitem"
                                     onClick={() =>
-                                        openEditModal(actionMenu.product)
+                                        openEditModal(
+                                            actionMenu.product
+                                        )
                                     }
                                 >
                                     Edit
@@ -672,13 +900,17 @@ export default function Index({
                                     className="products-menu-item products-menu-archive"
                                     role="menuitem"
                                     onClick={() =>
-                                        openArchiveModal(actionMenu.product)
+                                        openArchiveModal(
+                                            actionMenu.product
+                                        )
                                     }
                                 >
                                     Archive
                                 </button>
                             </>
                         )}
+
+                        {/* RESTORE */}
 
                         {actionMenu.product.archived_at && (
                             <>
@@ -689,7 +921,9 @@ export default function Index({
                                     className="products-menu-item"
                                     role="menuitem"
                                     onClick={() =>
-                                        openRestoreModal(actionMenu.product)
+                                        openRestoreModal(
+                                            actionMenu.product
+                                        )
                                     }
                                 >
                                     Restore
@@ -700,17 +934,29 @@ export default function Index({
                     document.body
                 )}
 
+            {/* ========================================
+                ADD PRODUCT MODAL
+            ======================================== */}
+
             <AddProductModal
                 isOpen={isAddModalOpen}
                 onClose={closeAddModal}
                 categories={categories}
             />
 
+            {/* ========================================
+                VIEW PRODUCT MODAL
+            ======================================== */}
+
             <ViewProductModal
                 isOpen={selectedProduct !== null}
                 onClose={closeViewModal}
                 product={selectedProduct}
             />
+
+            {/* ========================================
+                EDIT PRODUCT MODAL
+            ======================================== */}
 
             <EditProductModal
                 isOpen={editingProduct !== null}
@@ -719,11 +965,19 @@ export default function Index({
                 categories={categories}
             />
 
+            {/* ========================================
+                ARCHIVE PRODUCT MODAL
+            ======================================== */}
+
             <ArchiveProductModal
                 isOpen={archivingProduct !== null}
                 onClose={closeArchiveModal}
                 product={archivingProduct}
             />
+
+            {/* ========================================
+                RESTORE PRODUCT MODAL
+            ======================================== */}
 
             <RestoreProductModal
                 isOpen={restoringProduct !== null}

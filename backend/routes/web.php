@@ -7,6 +7,9 @@ use App\Http\Controllers\InventoryDashboardController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\StockInController;
+use App\Http\Controllers\StockOutController;
+use App\Http\Controllers\StockHistoryController;
 
 Route::get('/', function () {
     return redirect('/login');
@@ -26,6 +29,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'active'])->group(function () {
 
+    // Dashboard
     Route::get('/dashboard', [
         InventoryDashboardController::class,
         'index'
@@ -113,6 +117,34 @@ Route::middleware(['auth', 'active'])->group(function () {
         SupplierController::class,
         'reactivate'
     ])->name('inventory.suppliers.reactivate');
+
+    // Stock In
+    Route::get('/inventory/stock-in', [
+        StockInController::class,
+        'index'
+    ])->name('inventory.stock-in.index');
+
+    Route::post('/inventory/stock-in', [
+        StockInController::class,
+        'store'
+    ])->name('inventory.stock-in.store');
+
+    // Stock Out
+    Route::get('/inventory/stock-out', [
+        StockOutController::class,
+        'index'
+    ])->name('inventory.stock-out.index');
+
+    Route::post('/inventory/stock-out', [
+        StockOutController::class,
+        'store'
+    ])->name('inventory.stock-out.store');
+
+    // Stock History
+    Route::get('/inventory/stock-history', [
+        StockHistoryController::class,
+        'index'
+    ])->name('inventory.stock-history.index');
 
     // Logout
     Route::post('/logout', [

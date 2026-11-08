@@ -5,6 +5,17 @@ import { useForm } from "@inertiajs/react";
 import FormModal from "../../../../components/modals/FormModal.jsx";
 import SuccessModal from "../../../../components/modals/SuccessModal.jsx";
 
+const UNIT_OPTIONS = [
+    { value: "pcs", label: "Pieces (pcs)" },
+    { value: "bottle", label: "Bottle" },
+    { value: "pack", label: "Pack" },
+    { value: "box", label: "Box" },
+    { value: "kg", label: "Kilograms (kg)" },
+    { value: "g", label: "Grams (g)" },
+    { value: "L", label: "Liters (L)" },
+    { value: "mL", label: "Milliliters (mL)" },
+];
+
 export default function AddProductModal({
     isOpen,
     onClose,
@@ -26,7 +37,7 @@ export default function AddProductModal({
     const [skuError, setSkuError] = useState("");
 
     // ========================================
-    // ADD PRODUCT FORM
+    // PRODUCT FORM
     // ========================================
 
     const {
@@ -42,6 +53,8 @@ export default function AddProductModal({
         category_id: "",
         description: "",
         price: "",
+        unit_of_measure: "pcs",
+        reorder_level: "0",
         is_active: true,
     });
 
@@ -101,6 +114,7 @@ export default function AddProductModal({
                 if (!controller.signal.aborted) {
                     setDisplayedSku("");
                     setSkuError(error.message);
+
                     console.error(
                         "SKU preview error:",
                         error
@@ -134,7 +148,7 @@ export default function AddProductModal({
     };
 
     // ========================================
-    // CLOSE ADD PRODUCT MODAL
+    // CLOSE MODAL
     // ========================================
 
     const handleClose = () => {
@@ -152,6 +166,34 @@ export default function AddProductModal({
         event?.preventDefault();
 
         if (processing || isLoadingSku || skuError) {
+            return;
+        }
+
+        const normalizedName = data.name.trim();
+
+        const normalizedPrice = Number(data.price);
+
+        const normalizedReorderLevel = Number(
+            data.reorder_level
+        );
+
+        if (
+            !normalizedName ||
+            normalizedName.length < 3 ||
+            !data.category_id ||
+            data.price === "" ||
+            !Number.isFinite(normalizedPrice) ||
+            normalizedPrice < 0 ||
+            !data.unit_of_measure ||
+            data.reorder_level === "" ||
+            !Number.isFinite(normalizedReorderLevel) ||
+            normalizedReorderLevel < 0 ||
+            !Number.isFinite(
+                normalizedReorderLevel * 1000
+            ) ||
+            Math.round(normalizedReorderLevel * 1000) !==
+                normalizedReorderLevel * 1000
+        ) {
             return;
         }
 
@@ -186,10 +228,6 @@ export default function AddProductModal({
 
     return (
         <>
-            {/* ========================================
-                ADD PRODUCT FORM MODAL
-            ======================================== */}
-
             <FormModal
                 isOpen={isOpen}
                 onClose={handleClose}
@@ -225,9 +263,7 @@ export default function AddProductModal({
                             className="sc-form-label"
                         >
                             Product Name
-                            <span className="sc-form-required">
-                                *
-                            </span>
+                            <span className="sc-form-required">*</span>
                         </label>
 
                         <input
@@ -235,15 +271,14 @@ export default function AddProductModal({
                             type="text"
                             className="sc-form-input"
                             placeholder="e.g. Bottled Water 350ml"
+                            minLength={3}
                             maxLength={255}
                             value={data.name}
                             onChange={(event) =>
-                                setData(
-                                    "name",
-                                    event.target.value
-                                )
+                                setData("name", event.target.value)
                             }
                             aria-invalid={Boolean(errors.name)}
+                            required
                         />
 
                         {errors.name && (
@@ -256,8 +291,6 @@ export default function AddProductModal({
                     {/* SKU AND CATEGORY */}
 
                     <div className="sc-form-row">
-                        {/* SKU */}
-
                         <div className="sc-form-group">
                             <label
                                 htmlFor="product-sku"
@@ -296,17 +329,13 @@ export default function AddProductModal({
                             )}
                         </div>
 
-                        {/* CATEGORY */}
-
                         <div className="sc-form-group">
                             <label
                                 htmlFor="product-category"
                                 className="sc-form-label"
                             >
                                 Category
-                                <span className="sc-form-required">
-                                    *
-                                </span>
+                                <span className="sc-form-required">*</span>
                             </label>
 
                             <select
@@ -322,6 +351,7 @@ export default function AddProductModal({
                                 aria-invalid={Boolean(
                                     errors.category_id
                                 )}
+                                required
                             >
                                 <option value="">
                                     Select a category
@@ -363,6 +393,7 @@ export default function AddProductModal({
                             id="product-description"
                             className="sc-form-textarea"
                             rows={2}
+                            maxLength={5000}
                             placeholder="Add a short description..."
                             value={data.description}
                             onChange={(event) =>
@@ -381,6 +412,144 @@ export default function AddProductModal({
                                 {errors.description}
                             </p>
                         )}
+                    </div>
+                </div>
+
+                {/* ========================================
+                    INVENTORY MEASUREMENT
+                ======================================== */}
+
+                <div className="sc-form-section">
+                    <div className="sc-form-section-header">
+                        <h3 className="sc-form-section-title">
+                            Inventory Measurement
+                        </h3>
+
+                        <p className="sc-form-section-description">
+                            Define how this product will be measured
+                            and monitored in your inventory.
+                        </p>
+                    </div>
+
+                    <div className="sc-form-row">
+                        {/* UNIT OF MEASUREMENT */}
+
+                        <div className="sc-form-group">
+                            <label
+                                htmlFor="product-unit"
+                                className="sc-form-label"
+                            >
+                                Unit of Measurement
+
+                                <span className="sc-form-required">
+                                    *
+                                </span>
+                            </label>
+
+                            <select
+                                id="product-unit"
+                                className="sc-form-select"
+                                value={data.unit_of_measure}
+                                onChange={(event) =>
+                                    setData(
+                                        "unit_of_measure",
+                                        event.target.value
+                                    )
+                                }
+                                aria-invalid={Boolean(
+                                    errors.unit_of_measure
+                                )}
+                                required
+                            >
+                                <option value="">
+                                    Select a unit
+                                </option>
+
+                                {UNIT_OPTIONS.map((unit) => (
+                                    <option
+                                        key={unit.value}
+                                        value={unit.value}
+                                    >
+                                        {unit.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            {errors.unit_of_measure && (
+                                <p className="sc-form-error">
+                                    {errors.unit_of_measure}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* REORDER LEVEL */}
+
+                        <div className="sc-form-group">
+                            <label
+                                htmlFor="product-reorder-level"
+                                className="sc-form-label"
+                            >
+                                Reorder Level
+
+                                <span className="sc-form-required">
+                                    *
+                                </span>
+                            </label>
+
+                            <input
+                                id="product-reorder-level"
+                                type="number"
+                                className="sc-form-input"
+                                placeholder="e.g. 10"
+                                min="0"
+                                max="999999999.999"
+                                step="0.001"
+                                value={data.reorder_level}
+                                onChange={(event) =>
+                                    setData(
+                                        "reorder_level",
+                                        event.target.value
+                                    )
+                                }
+                                aria-invalid={Boolean(
+                                    errors.reorder_level
+                                )}
+                                required
+                            />
+
+                            <p className="sc-form-help">
+                                Minimum stock quantity before
+                                the product needs replenishment.
+                            </p>
+
+                            {errors.reorder_level && (
+                                <p className="sc-form-error">
+                                    {errors.reorder_level}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="sc-form-notice">
+                        <div
+                            className="sc-form-notice-icon"
+                            aria-hidden="true"
+                        >
+                            i
+                        </div>
+
+                        <div className="sc-form-notice-content">
+                            <p className="sc-form-notice-title">
+                                Consistent Inventory Units
+                            </p>
+
+                            <p className="sc-form-notice-description">
+                                Use one consistent unit for each product.
+                                For example, use kg for flour or pcs for
+                                individually sold snacks. Weight-based
+                                products support decimal quantities.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -406,9 +575,7 @@ export default function AddProductModal({
                         >
                             Selling Price
 
-                            <span className="sc-form-required">
-                                *
-                            </span>
+                            <span className="sc-form-required">*</span>
                         </label>
 
                         <div className="sc-form-price">
@@ -431,9 +598,8 @@ export default function AddProductModal({
                                         event.target.value
                                     )
                                 }
-                                aria-invalid={Boolean(
-                                    errors.price
-                                )}
+                                aria-invalid={Boolean(errors.price)}
+                                required
                             />
                         </div>
 
@@ -468,34 +634,24 @@ export default function AddProductModal({
                         >
                             Product Status
 
-                            <span className="sc-form-required">
-                                *
-                            </span>
+                            <span className="sc-form-required">*</span>
                         </label>
 
                         <select
                             id="product-status"
                             className="sc-form-select"
-                            value={
-                                data.is_active ? "1" : "0"
-                            }
+                            value={data.is_active ? "1" : "0"}
                             onChange={(event) =>
                                 setData(
                                     "is_active",
                                     event.target.value === "1"
                                 )
                             }
-                            aria-invalid={Boolean(
-                                errors.is_active
-                            )}
+                            aria-invalid={Boolean(errors.is_active)}
+                            required
                         >
-                            <option value="1">
-                                Active
-                            </option>
-
-                            <option value="0">
-                                Inactive
-                            </option>
+                            <option value="1">Active</option>
+                            <option value="0">Inactive</option>
                         </select>
 
                         <p className="sc-form-help">
@@ -513,7 +669,7 @@ export default function AddProductModal({
                 </div>
 
                 {/* ========================================
-                    STOCK INFORMATION
+                    STARTING INVENTORY NOTICE
                 ======================================== */}
 
                 <div className="sc-form-notice">
@@ -526,12 +682,14 @@ export default function AddProductModal({
 
                     <div className="sc-form-notice-content">
                         <p className="sc-form-notice-title">
-                            Starting inventory: 0 units
+                            Starting Inventory: 0{" "}
+                            {data.unit_of_measure}
                         </p>
 
                         <p className="sc-form-notice-description">
-                            Stock quantities are managed separately
-                            through Stock In and Stock Out.
+                            New products always start with zero stock.
+                            Record received quantities separately through
+                            the Stock In process.
                         </p>
                     </div>
                 </div>

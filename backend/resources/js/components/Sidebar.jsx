@@ -76,7 +76,7 @@ export default function Sidebar() {
                 },
                 {
                     name: "Stock History",
-                    path: "/inventory/history",
+                    path: "/inventory/stock-history",
                     icon: History,
                 },
             ],

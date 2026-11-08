@@ -1,0 +1,144 @@
+/* STOCK HISTORY DATE FILTER */
+
+.stock-history-date-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stock-history-date-control {
+    position: relative;
+    width: 155px;
+    height: 38px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+/* DATE BUTTON */
+
+.stock-history-date-trigger {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    height: 100%;
+    padding: 0 11px;
+    box-sizing: border-box;
+
+    background: #ffffff;
+    border: 1px solid #dce3df;
+    border-radius: 6px;
+
+    color: #52665a;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    text-align: left;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.stock-history-date-trigger:hover {
+    border-color: #176b3a;
+}
+
+.stock-history-date-trigger:focus {
+    outline: none;
+    border-color: #176b3a;
+    box-shadow: 0 0 0 2px rgba(23, 107, 58, 0.08);
+}
+
+.stock-history-date-trigger:focus-visible {
+    outline: 2px solid rgba(23, 107, 58, 0.2);
+    outline-offset: 2px;
+}
+
+.stock-history-date-trigger svg {
+    flex-shrink: 0;
+    color: #84958a;
+}
+
+.stock-history-date-trigger span {
+    display: block;
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* HIDDEN NATIVE DATE INPUT */
+
+.stock-history-hidden-date {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+
+    width: 1px !important;
+    height: 1px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    opacity: 0 !important;
+    pointer-events: none !important;
+
+    border: 0 !important;
+    overflow: hidden !important;
+}
+
+/* DATE SEPARATOR */
+
+.stock-history-date-separator {
+    color: #87928b;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* FILTER ACTIONS */
+
+.stock-history-filters .products-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 768px) {
+    .stock-history-filters .products-search-field {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .stock-history-filters .stock-history-type {
+        width: 100%;
+    }
+
+    .stock-history-date-filter {
+        width: 100%;
+    }
+
+    .stock-history-date-control {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .stock-history-date-filter {
+        gap: 6px;
+    }
+
+    .stock-history-date-control {
+        width: auto;
+    }
+
+    .stock-history-date-trigger {
+        padding: 0 9px;
+        font-size: 11px;
+    }
+}
