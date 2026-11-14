@@ -1,0 +1,726 @@
+
+/* ========================================
+   SALES PAGE LAYOUT
+======================================== */
+
+.sales-layout {
+    min-height: 100vh;
+    background: #f5f7f6;
+}
+
+.sales-main {
+    margin-left: 240px;
+    min-height: 100vh;
+    min-width: 0;
+    padding: 28px 32px;
+    box-sizing: border-box;
+    background: #f5f7f6;
+}
+
+.sales-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.sales-page-header h1 {
+    margin: 0;
+    color: #1f3028;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.sales-page-header p {
+    margin: 6px 0 0;
+    color: #7a8980;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.sales-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-width: 0;
+}
+
+/* ========================================
+   SUMMARY CARDS
+======================================== */
+
+.sales-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.sales-summary-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+    min-height: 125px;
+    padding: 20px;
+    border: 1px solid #e1e8e3;
+    border-radius: 8px;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.sales-summary-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sales-summary-card-top > span {
+    color: #718077;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.sales-summary-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 8px;
+}
+
+.sales-summary-total {
+    background: #e8f4ec;
+    color: #176b3a;
+}
+
+.sales-summary-completed {
+    background: #eaf1fb;
+    color: #3971b8;
+}
+
+.sales-summary-items {
+    background: #fff3e5;
+    color: #c1842f;
+}
+
+.sales-summary-average {
+    background: #f0edfb;
+    color: #7d5ac2;
+}
+
+.sales-summary-card h2 {
+    margin: 16px 0 0;
+    color: #263b30;
+    font-size: 25px;
+    font-weight: 650;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   SALES RECORDS SECTION
+======================================== */
+
+.sales-records-section {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #e1e8e3;
+    border-radius: 8px;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.sales-records-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #edf1ee;
+}
+
+.sales-records-header h2 {
+    margin: 0;
+    color: #263b30;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.sales-records-header p {
+    margin: 5px 0 0;
+    color: #839087;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.sales-record-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border: 1px solid #e1e8e3;
+    border-radius: 6px;
+    background: #f7faf8;
+    color: #52665a;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ========================================
+   SALES FILTER CONTAINER
+======================================== */
+
+.sales-filter-container {
+    width: 100%;
+    padding: 16px 22px;
+    border-bottom: 1px solid #edf1ee;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.sales-toolbar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* ========================================
+   TRANSACTION SEARCH
+======================================== */
+
+.sales-search-control {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex: 1 1 240px;
+    gap: 9px;
+    min-width: 180px;
+    max-width: 390px;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid #dce3df;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #718077;
+    box-sizing: border-box;
+}
+
+.sales-search-control:hover {
+    border-color: #bdcbc1;
+}
+
+.sales-search-control:focus-within {
+    border-color: #176b3a;
+    box-shadow: 0 0 0 2px rgba(23, 107, 58, 0.08);
+}
+
+.sales-search-control svg {
+    flex-shrink: 0;
+}
+
+.sales-search-control input {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    color: #263b30;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.sales-search-control input:focus {
+    border: none;
+    outline: none;
+    box-shadow: none;
+}
+
+.sales-search-control input::placeholder {
+    color: #9aa69e;
+}
+
+/* ========================================
+   DATE RANGE FILTERS
+======================================== */
+
+.sales-date-filters {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.sales-date-control {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 170px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid #dce3df;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #718077;
+    box-sizing: border-box;
+}
+
+.sales-date-control:hover {
+    border-color: #bdcbc1;
+}
+
+.sales-date-control:focus-within {
+    border-color: #176b3a;
+    box-shadow: 0 0 0 2px rgba(23, 107, 58, 0.08);
+}
+
+.sales-date-control svg {
+    flex-shrink: 0;
+}
+
+.sales-date-control input {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    color: #52665a;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    color-scheme: light;
+}
+
+.sales-date-control input:focus {
+    border: none;
+    outline: none;
+    box-shadow: none;
+}
+
+.sales-date-control input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.sales-date-separator {
+    color: #839087;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* ========================================
+   SEARCH AND CLEAR BUTTONS
+======================================== */
+
+.sales-search-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: auto;
+    height: 38px;
+    margin: 0;
+    padding: 0 17px;
+    border: 1px solid #176b3a;
+    border-radius: 6px;
+    background: #176b3a;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: normal;
+    cursor: pointer;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+.sales-search-button:hover:not(:disabled) {
+    background: #12582f;
+    border-color: #12582f;
+}
+
+.sales-search-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.sales-clear-button {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    gap: 6px;
+    width: auto;
+    height: 38px;
+    margin: 0;
+    padding: 0 12px;
+    border: 1px solid #dce3df;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #52665a;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: normal;
+    cursor: pointer;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+.sales-clear-button:hover {
+    background: #f5f7f6;
+    border-color: #bdcbc1;
+}
+
+.sales-filter-error {
+    margin: 9px 0 0;
+    color: #c44848;
+    font-size: 12px;
+}
+
+/* ========================================
+   EMPTY STATE
+======================================== */
+
+.sales-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 245px;
+    padding: 28px;
+    background: #ffffff;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.sales-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    margin-bottom: 14px;
+    border-radius: 50%;
+    background: #f0f5f1;
+    color: #789382;
+}
+
+.sales-empty-state h3 {
+    margin: 0 0 6px;
+    color: #42574a;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.sales-empty-state p {
+    margin: 0;
+    max-width: 430px;
+    color: #8a978e;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* ========================================
+   SALES TABLE
+======================================== */
+
+.sales-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.sales-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    text-align: left;
+    font-size: 12px;
+}
+
+.sales-table thead {
+    background: #f8faf9;
+}
+
+.sales-table th {
+    padding: 15px 18px;
+    border-bottom: 1px solid #e8eee9;
+    color: #697b70;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.sales-table td {
+    padding: 16px 18px;
+    border-bottom: 1px solid #edf1ee;
+    color: #42574a;
+    font-size: 12px;
+    vertical-align: middle;
+}
+
+.sales-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.sales-table tbody tr:hover {
+    background: #fafcfb;
+}
+
+.sales-transaction-number {
+    color: #176b3a !important;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sales-amount {
+    color: #263b30 !important;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   SALES PAGINATION
+======================================== */
+
+.sales-pagination {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 15px 22px;
+    border-top: 1px solid #edf1ee;
+    background: #ffffff;
+}
+
+.sales-pagination-info {
+    color: #78877d;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.sales-pagination-info strong {
+    color: #42574a;
+    font-weight: 600;
+}
+
+.sales-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sales-page-button {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 34px;
+    margin: 0;
+    padding: 0 11px;
+    border: 1px solid #dce3df;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #52665a;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.sales-page-button:hover:not(:disabled) {
+    background: #f5f7f6;
+    border-color: #bdcbc1;
+}
+
+.sales-page-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.sales-page-indicator {
+    color: #52665a;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* ========================================
+   RESPONSIVE LAYOUT
+======================================== */
+
+@media (max-width: 1350px) {
+    .sales-toolbar {
+        gap: 10px;
+    }
+
+    .sales-search-control {
+        max-width: none;
+    }
+}
+
+@media (max-width: 1200px) {
+    .sales-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1000px) {
+    .sales-toolbar {
+        align-items: stretch;
+    }
+
+    .sales-search-control {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+
+    .sales-date-filters {
+        flex: 0 1 auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .sales-main {
+        padding: 20px 16px;
+    }
+
+    .sales-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .sales-content {
+        gap: 16px;
+    }
+
+    .sales-summary-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .sales-summary-card {
+        min-height: 110px;
+    }
+
+    .sales-records-header {
+        flex-wrap: wrap;
+        padding: 18px;
+    }
+
+    .sales-filter-container {
+        padding: 14px;
+    }
+
+    .sales-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sales-search-control {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .sales-date-filters {
+        width: 100%;
+    }
+
+    .sales-date-control {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .sales-date-control input {
+        width: 100%;
+    }
+
+    .sales-search-button,
+    .sales-clear-button {
+        width: 100%;
+    }
+
+    .sales-table {
+        min-width: 850px;
+    }
+
+    .sales-pagination {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sales-main {
+        padding: 16px 12px;
+    }
+
+    .sales-page-header h1 {
+        font-size: 21px;
+    }
+
+    .sales-records-header {
+        padding: 16px;
+    }
+
+    .sales-date-control {
+        padding: 0 7px;
+        gap: 5px;
+    }
+
+    .sales-date-control svg {
+        display: none;
+    }
+
+    .sales-pagination-controls {
+        width: 100%;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .sales-page-button {
+        padding: 0 8px;
+    }
+}

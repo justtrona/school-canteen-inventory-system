@@ -88,6 +88,7 @@ export default function Sidebar() {
                     name: "Point of Sale",
                     path: "/pos",
                     icon: ShoppingCart,
+                    superadminOnly: true,
                 },
                 {
                     name: "Orders",
@@ -163,7 +164,6 @@ export default function Sidebar() {
 
     const isActive = (path) => {
         const currentPath = url.split("?")[0];
-
         return currentPath === path;
     };
 
@@ -209,6 +209,7 @@ export default function Sidebar() {
                                     aria-current={
                                         active ? "page" : undefined
                                     }
+                                    aria-label={item.name}
                                 >
                                     <Icon
                                         size={17}

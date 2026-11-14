@@ -10,6 +10,10 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\StockInController;
 use App\Http\Controllers\StockOutController;
 use App\Http\Controllers\StockHistoryController;
+use App\Http\Controllers\POSController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\SalesController;
 
 Route::get('/', function () {
     return redirect('/login');
@@ -19,7 +23,7 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [
         AuthenticatedSessionController::class,
         'create'
-    ])->name('login');
+    ])->name('login');  
 
     Route::post('/login', [
         AuthenticatedSessionController::class,
@@ -154,10 +158,42 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     // Superadmin
     Route::middleware('superadmin')->group(function () {
+
+        // Point of Sale
+        Route::get('/pos', [
+            POSController::class,
+            'index'
+        ])->name('pos.index');
+
+        // Orders
+        Route::get('/orders', [
+            OrderController::class,
+            'index'
+        ])->name('orders.index');
+
+        Route::get('/orders/{order}', [
+            OrderController::class,
+            'show'
+        ])->whereNumber('order')->name('orders.show');
+
+        // Payments
+        Route::get('/payments', [
+            PaymentController::class,
+            'index'
+        ])->name('payments.index');
+
+        // Sales
+        Route::get('/sales', [
+            SalesController::class,
+            'index'
+        ])->name('sales.index');
+
+        // Superadmin Test
         Route::get('/superadmin/test', function () {
             return response()->json([
                 'message' => 'Superadmin access granted.',
             ]);
         })->name('superadmin.test');
+
     });
 });
