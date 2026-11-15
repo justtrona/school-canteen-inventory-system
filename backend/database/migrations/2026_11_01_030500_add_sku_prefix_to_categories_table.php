@@ -2,23 +2,18 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('categories', function (Blueprint $table) {
-            $table->string('sku_prefix', 20)->nullable()->unique();
-        });
+        // No changes needed.
+        // sku_prefix already exists in the categories table.
     }
 
     public function down(): void
     {
-        Schema::table('categories', function (Blueprint $table) {
-            $table->dropUnique(['sku_prefix']);
-            $table->dropColumn('sku_prefix');
-        });
+        // Intentionally empty.
+        // Preserve existing category SKU prefixes.
     }
 };
