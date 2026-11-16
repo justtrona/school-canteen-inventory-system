@@ -16,29 +16,40 @@ const UNIT_OPTIONS = [
     { value: "mL", label: "Milliliters (mL)" },
 ];
 
+const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+const isValidMoney = (value, allowZero = false) => {
+    const text = String(value);
+
+    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+        return false;
+    }
+
+    const amount = Number(text);
+
+    return (
+        Number.isFinite(amount) &&
+        amount <= 99999999.99 &&
+        (allowZero ? amount >= 0 : amount > 0)
+    );
+};
+
 export default function AddProductModal({
     isOpen,
     onClose,
     categories = [],
 }) {
-    // ========================================
-    // SUCCESS MODAL STATE
-    // ========================================
-
-    const [isSuccessModalOpen, setIsSuccessModalOpen] =
-        useState(false);
-
-    // ========================================
-    // SKU PREVIEW STATE
-    // ========================================
-
+    const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
     const [displayedSku, setDisplayedSku] = useState("");
     const [isLoadingSku, setIsLoadingSku] = useState(false);
     const [skuError, setSkuError] = useState("");
-
-    // ========================================
-    // PRODUCT FORM
-    // ========================================
+    const [localErrors, setLocalErrors] = useState({});
 
     const {
         data,
@@ -52,15 +63,46 @@ export default function AddProductModal({
         name: "",
         category_id: "",
         description: "",
+        purchase_cost: "",
         price: "",
         unit_of_measure: "pcs",
         reorder_level: "0",
         is_active: true,
     });
 
-    // ========================================
-    // AUTOMATIC SKU PREVIEW
-    // ========================================
+    const purchaseCostValid = isValidMoney(data.purchase_cost);
+    const sellingPriceValid = isValidMoney(data.price, true);
+
+    const sellingPriceBelowCost =
+        purchaseCostValid &&
+        sellingPriceValid &&
+        Number(data.price) < Number(data.purchase_cost);
+
+    const pricingError = sellingPriceBelowCost
+        ? `Selling price cannot be lower than the supplier purchase cost. Minimum selling price: ${formatCurrency(data.purchase_cost)}.`
+        : "";
+
+    const getError = (field) =>
+        localErrors[field] || errors[field] || "";
+
+    const updateField = (field, value) => {
+        setData(field, value);
+
+        setLocalErrors((previous) => {
+            if (!previous[field]) {
+                return previous;
+            }
+
+            const next = { ...previous };
+            delete next[field];
+
+            return next;
+        });
+
+        if (errors[field]) {
+            clearErrors(field);
+        }
+    };
 
     useEffect(() => {
         if (!isOpen || !data.category_id) {
@@ -115,10 +157,7 @@ export default function AddProductModal({
                     setDisplayedSku("");
                     setSkuError(error.message);
 
-                    console.error(
-                        "SKU preview error:",
-                        error
-                    );
+                    console.error("SKU preview error:", error);
                 }
             } finally {
                 if (!controller.signal.aborted) {
@@ -134,22 +173,14 @@ export default function AddProductModal({
         };
     }, [isOpen, data.category_id]);
 
-    // ========================================
-    // RESET FORM
-    // ========================================
-
     const resetForm = () => {
         reset();
         clearErrors();
-
+        setLocalErrors({});
         setDisplayedSku("");
         setIsLoadingSku(false);
         setSkuError("");
     };
-
-    // ========================================
-    // CLOSE MODAL
-    // ========================================
 
     const handleClose = () => {
         if (processing) return;
@@ -158,10 +189,6 @@ export default function AddProductModal({
         onClose();
     };
 
-    // ========================================
-    // SAVE PRODUCT
-    // ========================================
-
     const handleSubmit = (event) => {
         event?.preventDefault();
 
@@ -169,37 +196,64 @@ export default function AddProductModal({
             return;
         }
 
+        const nextErrors = {};
         const normalizedName = data.name.trim();
-
-        const normalizedPrice = Number(data.price);
-
         const normalizedReorderLevel = Number(
             data.reorder_level
         );
 
         if (
-            !normalizedName ||
             normalizedName.length < 3 ||
-            !data.category_id ||
-            data.price === "" ||
-            !Number.isFinite(normalizedPrice) ||
-            normalizedPrice < 0 ||
-            !data.unit_of_measure ||
+            normalizedName.length > 255
+        ) {
+            nextErrors.name =
+                "Product name must have between 3 and 255 characters.";
+        }
+
+        if (!data.category_id) {
+            nextErrors.category_id =
+                "Please select a product category.";
+        }
+
+        if (!purchaseCostValid) {
+            nextErrors.purchase_cost =
+                "Enter a valid purchase cost greater than zero with up to 2 decimal places.";
+        }
+
+        if (!sellingPriceValid) {
+            nextErrors.price =
+                "Enter a valid selling price with up to 2 decimal places.";
+        } else if (sellingPriceBelowCost) {
+            nextErrors.price = pricingError;
+        }
+
+        if (!data.unit_of_measure) {
+            nextErrors.unit_of_measure =
+                "Please select a unit of measurement.";
+        }
+
+        if (
             data.reorder_level === "" ||
+            !/^\d+(?:\.\d{1,3})?$/.test(
+                String(data.reorder_level)
+            ) ||
             !Number.isFinite(normalizedReorderLevel) ||
             normalizedReorderLevel < 0 ||
-            !Number.isFinite(
-                normalizedReorderLevel * 1000
-            ) ||
-            Math.round(normalizedReorderLevel * 1000) !==
-                normalizedReorderLevel * 1000
+            normalizedReorderLevel > 999999999.999
         ) {
+            nextErrors.reorder_level =
+                "Enter a valid reorder level with up to 3 decimal places.";
+        }
+
+        if (Object.keys(nextErrors).length > 0) {
+            setLocalErrors(nextErrors);
             return;
         }
 
+        setLocalErrors({});
+
         post("/inventory/products", {
             preserveScroll: true,
-
             onSuccess: () => {
                 resetForm();
                 onClose();
@@ -207,10 +261,6 @@ export default function AddProductModal({
             },
         });
     };
-
-    // ========================================
-    // SKU DISPLAY TEXT
-    // ========================================
 
     const skuPlaceholder = isLoadingSku
         ? "Generating SKU..."
@@ -221,10 +271,6 @@ export default function AddProductModal({
         : displayedSku
           ? "SKU generated automatically based on the selected category."
           : "Select a category to generate an SKU.";
-
-    // ========================================
-    // RENDER
-    // ========================================
 
     return (
         <>
@@ -240,22 +286,15 @@ export default function AddProductModal({
                 submitLabel="Save Product"
                 isSubmitting={processing}
             >
-                {/* ========================================
-                    PRODUCT INFORMATION
-                ======================================== */}
-
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
                             Product Information
                         </h3>
-
                         <p className="sc-form-section-description">
                             Basic details used to identify this product.
                         </p>
                     </div>
-
-                    {/* PRODUCT NAME */}
 
                     <div className="sc-form-group">
                         <label
@@ -263,7 +302,9 @@ export default function AddProductModal({
                             className="sc-form-label"
                         >
                             Product Name
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <input
@@ -275,20 +316,23 @@ export default function AddProductModal({
                             maxLength={255}
                             value={data.name}
                             onChange={(event) =>
-                                setData("name", event.target.value)
+                                updateField(
+                                    "name",
+                                    event.target.value
+                                )
                             }
-                            aria-invalid={Boolean(errors.name)}
+                            aria-invalid={Boolean(
+                                getError("name")
+                            )}
                             required
                         />
 
-                        {errors.name && (
+                        {getError("name") && (
                             <p className="sc-form-error">
-                                {errors.name}
+                                {getError("name")}
                             </p>
                         )}
                     </div>
-
-                    {/* SKU AND CATEGORY */}
 
                     <div className="sc-form-row">
                         <div className="sc-form-group">
@@ -335,7 +379,9 @@ export default function AddProductModal({
                                 className="sc-form-label"
                             >
                                 Category
-                                <span className="sc-form-required">*</span>
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <select
@@ -343,13 +389,13 @@ export default function AddProductModal({
                                 className="sc-form-select"
                                 value={data.category_id}
                                 onChange={(event) =>
-                                    setData(
+                                    updateField(
                                         "category_id",
                                         event.target.value
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    errors.category_id
+                                    getError("category_id")
                                 )}
                                 required
                             >
@@ -367,15 +413,13 @@ export default function AddProductModal({
                                 ))}
                             </select>
 
-                            {errors.category_id && (
+                            {getError("category_id") && (
                                 <p className="sc-form-error">
-                                    {errors.category_id}
+                                    {getError("category_id")}
                                 </p>
                             )}
                         </div>
                     </div>
-
-                    {/* DESCRIPTION */}
 
                     <div className="sc-form-group">
                         <label
@@ -383,7 +427,6 @@ export default function AddProductModal({
                             className="sc-form-label"
                         >
                             Description
-
                             <span className="sc-form-optional">
                                 Optional
                             </span>
@@ -397,34 +440,29 @@ export default function AddProductModal({
                             placeholder="Add a short description..."
                             value={data.description}
                             onChange={(event) =>
-                                setData(
+                                updateField(
                                     "description",
                                     event.target.value
                                 )
                             }
                             aria-invalid={Boolean(
-                                errors.description
+                                getError("description")
                             )}
                         />
 
-                        {errors.description && (
+                        {getError("description") && (
                             <p className="sc-form-error">
-                                {errors.description}
+                                {getError("description")}
                             </p>
                         )}
                     </div>
                 </div>
-
-                {/* ========================================
-                    INVENTORY MEASUREMENT
-                ======================================== */}
 
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
                             Inventory Measurement
                         </h3>
-
                         <p className="sc-form-section-description">
                             Define how this product will be measured
                             and monitored in your inventory.
@@ -432,15 +470,12 @@ export default function AddProductModal({
                     </div>
 
                     <div className="sc-form-row">
-                        {/* UNIT OF MEASUREMENT */}
-
                         <div className="sc-form-group">
                             <label
                                 htmlFor="product-unit"
                                 className="sc-form-label"
                             >
                                 Unit of Measurement
-
                                 <span className="sc-form-required">
                                     *
                                 </span>
@@ -451,13 +486,13 @@ export default function AddProductModal({
                                 className="sc-form-select"
                                 value={data.unit_of_measure}
                                 onChange={(event) =>
-                                    setData(
+                                    updateField(
                                         "unit_of_measure",
                                         event.target.value
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    errors.unit_of_measure
+                                    getError("unit_of_measure")
                                 )}
                                 required
                             >
@@ -475,14 +510,12 @@ export default function AddProductModal({
                                 ))}
                             </select>
 
-                            {errors.unit_of_measure && (
+                            {getError("unit_of_measure") && (
                                 <p className="sc-form-error">
-                                    {errors.unit_of_measure}
+                                    {getError("unit_of_measure")}
                                 </p>
                             )}
                         </div>
-
-                        {/* REORDER LEVEL */}
 
                         <div className="sc-form-group">
                             <label
@@ -490,7 +523,6 @@ export default function AddProductModal({
                                 className="sc-form-label"
                             >
                                 Reorder Level
-
                                 <span className="sc-form-required">
                                     *
                                 </span>
@@ -506,13 +538,13 @@ export default function AddProductModal({
                                 step="0.001"
                                 value={data.reorder_level}
                                 onChange={(event) =>
-                                    setData(
+                                    updateField(
                                         "reorder_level",
                                         event.target.value
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    errors.reorder_level
+                                    getError("reorder_level")
                                 )}
                                 required
                             />
@@ -522,9 +554,9 @@ export default function AddProductModal({
                                 the product needs replenishment.
                             </p>
 
-                            {errors.reorder_level && (
+                            {getError("reorder_level") && (
                                 <p className="sc-form-error">
-                                    {errors.reorder_level}
+                                    {getError("reorder_level")}
                                 </p>
                             )}
                         </div>
@@ -553,19 +585,66 @@ export default function AddProductModal({
                     </div>
                 </div>
 
-                {/* ========================================
-                    PRICING
-                ======================================== */}
-
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
                             Pricing
                         </h3>
-
                         <p className="sc-form-section-description">
-                            Set the selling price for this product.
+                            Selling price must be equal to or higher
+                            than the supplier purchase cost.
                         </p>
+                    </div>
+
+                    <div className="sc-form-group">
+                        <label
+                            htmlFor="product-purchase-cost"
+                            className="sc-form-label"
+                        >
+                            Supplier Purchase Cost
+                            <span className="sc-form-required">
+                                *
+                            </span>
+                        </label>
+
+                        <div className="sc-form-price">
+                            <span className="sc-form-currency">
+                                ₱
+                            </span>
+
+                            <input
+                                id="product-purchase-cost"
+                                type="number"
+                                className="sc-form-price-input"
+                                placeholder="0.00"
+                                min="0.01"
+                                max="99999999.99"
+                                step="0.01"
+                                value={data.purchase_cost}
+                                onChange={(event) =>
+                                    updateField(
+                                        "purchase_cost",
+                                        event.target.value
+                                    )
+                                }
+                                aria-invalid={Boolean(
+                                    getError("purchase_cost")
+                                )}
+                                required
+                            />
+                        </div>
+
+                        <p className="sc-form-help">
+                            Initial cost per unit from the supplier.
+                            Actual delivery costs are recorded during
+                            Stock In.
+                        </p>
+
+                        {getError("purchase_cost") && (
+                            <p className="sc-form-error">
+                                {getError("purchase_cost")}
+                            </p>
+                        )}
                     </div>
 
                     <div className="sc-form-group">
@@ -574,8 +653,9 @@ export default function AddProductModal({
                             className="sc-form-label"
                         >
                             Selling Price
-
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <div className="sc-form-price">
@@ -593,34 +673,66 @@ export default function AddProductModal({
                                 step="0.01"
                                 value={data.price}
                                 onChange={(event) =>
-                                    setData(
+                                    updateField(
                                         "price",
                                         event.target.value
                                     )
                                 }
-                                aria-invalid={Boolean(errors.price)}
+                                aria-invalid={Boolean(
+                                    getError("price") ||
+                                    sellingPriceBelowCost
+                                )}
+                                aria-describedby={
+                                    sellingPriceBelowCost
+                                        ? "product-pricing-warning"
+                                        : undefined
+                                }
                                 required
                             />
                         </div>
 
-                        {errors.price && (
-                            <p className="sc-form-error">
-                                {errors.price}
+                        {sellingPriceBelowCost && (
+                            <p
+                                id="product-pricing-warning"
+                                className="sc-form-error"
+                                role="alert"
+                                style={{
+                                    color: "#dc2626",
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {pricingError}
                             </p>
                         )}
+
+                        {!sellingPriceBelowCost &&
+                            purchaseCostValid &&
+                            sellingPriceValid && (
+                                <p className="sc-form-help">
+                                    Gross profit per unit:{" "}
+                                    <strong>
+                                        {formatCurrency(
+                                            Number(data.price) -
+                                            Number(data.purchase_cost)
+                                        )}
+                                    </strong>
+                                </p>
+                            )}
+
+                        {getError("price") &&
+                            getError("price") !== pricingError && (
+                                <p className="sc-form-error">
+                                    {getError("price")}
+                                </p>
+                            )}
                     </div>
                 </div>
-
-                {/* ========================================
-                    AVAILABILITY
-                ======================================== */}
 
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
                             Availability
                         </h3>
-
                         <p className="sc-form-section-description">
                             Control whether this product is available
                             for sale.
@@ -633,8 +745,9 @@ export default function AddProductModal({
                             className="sc-form-label"
                         >
                             Product Status
-
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <select
@@ -642,12 +755,14 @@ export default function AddProductModal({
                             className="sc-form-select"
                             value={data.is_active ? "1" : "0"}
                             onChange={(event) =>
-                                setData(
+                                updateField(
                                     "is_active",
                                     event.target.value === "1"
                                 )
                             }
-                            aria-invalid={Boolean(errors.is_active)}
+                            aria-invalid={Boolean(
+                                getError("is_active")
+                            )}
                             required
                         >
                             <option value="1">Active</option>
@@ -660,17 +775,13 @@ export default function AddProductModal({
                                 : "Inactive products cannot be sold but remain in inventory records."}
                         </p>
 
-                        {errors.is_active && (
+                        {getError("is_active") && (
                             <p className="sc-form-error">
-                                {errors.is_active}
+                                {getError("is_active")}
                             </p>
                         )}
                     </div>
                 </div>
-
-                {/* ========================================
-                    STARTING INVENTORY NOTICE
-                ======================================== */}
 
                 <div className="sc-form-notice">
                     <div
@@ -694,10 +805,6 @@ export default function AddProductModal({
                     </div>
                 </div>
             </FormModal>
-
-            {/* ========================================
-                SUCCESS MODAL
-            ======================================== */}
 
             <SuccessModal
                 isOpen={isSuccessModalOpen}

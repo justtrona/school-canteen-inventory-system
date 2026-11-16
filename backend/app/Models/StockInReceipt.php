@@ -7,19 +7,35 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockInReceipt extends Model
 {
+    // ========================================
+    // MASS ASSIGNABLE FIELDS
+    // ========================================
+
     protected $fillable = [
         'stock_movement_id',
         'supplier_id',
         'reference_number',
         'received_at',
+        'unit_cost',
+        'total_cost',
     ];
+
+    // ========================================
+    // ATTRIBUTE CASTING
+    // ========================================
 
     protected function casts(): array
     {
         return [
             'received_at' => 'date:Y-m-d',
+            'unit_cost' => 'decimal:2',
+            'total_cost' => 'decimal:2',
         ];
     }
+
+    // ========================================
+    // RELATIONSHIPS
+    // ========================================
 
     public function stockMovement(): BelongsTo
     {
@@ -31,6 +47,8 @@ class StockInReceipt extends Model
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class);
+        return $this->belongsTo(
+            Supplier::class
+        );
     }
 }

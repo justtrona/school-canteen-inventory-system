@@ -16,8 +16,29 @@ const UNIT_OPTIONS = [
     { value: "mL", label: "Milliliters (mL)" },
 ];
 
-const PRICE_PATTERN = /^\d+(\.\d{1,2})?$/;
-const QUANTITY_PATTERN = /^\d+(\.\d{1,3})?$/;
+const PRICE_PATTERN = /^\d+(?:\.\d{1,2})?$/;
+const QUANTITY_PATTERN = /^\d+(?:\.\d{1,3})?$/;
+
+const toCents = (value) => {
+    const text = String(value ?? "").trim();
+
+    if (!PRICE_PATTERN.test(text)) return null;
+
+    const [whole, fraction = ""] = text.split(".");
+    const cents =
+        Number(whole) * 100 +
+        Number(fraction.padEnd(2, "0"));
+
+    return Number.isSafeInteger(cents) ? cents : null;
+};
+
+const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
 
 export default function EditProductModal({
     isOpen,
@@ -25,19 +46,11 @@ export default function EditProductModal({
     product,
     categories = [],
 }) {
-    // ========================================
-    // MODAL STATES
-    // ========================================
-
     const [isSuccessModalOpen, setIsSuccessModalOpen] =
         useState(false);
 
     const [validationErrors, setValidationErrors] =
         useState({});
-
-    // ========================================
-    // FORM
-    // ========================================
 
     const {
         data,
@@ -53,15 +66,57 @@ export default function EditProductModal({
         name: "",
         category_id: "",
         description: "",
+        purchase_cost: "",
         price: "",
         unit_of_measure: "pcs",
         reorder_level: "0",
         is_active: true,
     });
 
-    // ========================================
-    // FIELD ERRORS
-    // ========================================
+    const savedPurchaseCostCents =
+        toCents(product?.purchase_cost) ?? 0;
+
+    const latestUnitCostCents =
+        toCents(product?.latest_unit_cost) ?? 0;
+
+    const enteredPurchaseCostCents =
+        toCents(data.purchase_cost);
+
+    const enteredPriceCents = toCents(data.price);
+
+    const hasPurchaseCost =
+        data.purchase_cost !== "" &&
+        enteredPurchaseCostCents !== null &&
+        enteredPurchaseCostCents > 0 &&
+        enteredPurchaseCostCents <= 9999999999;
+
+    const hasSellingPrice =
+        data.price !== "" &&
+        enteredPriceCents !== null &&
+        enteredPriceCents >= 0 &&
+        enteredPriceCents <= 9999999999;
+
+    const effectivePurchaseCostCents =
+        data.purchase_cost === ""
+            ? savedPurchaseCostCents
+            : hasPurchaseCost
+              ? enteredPurchaseCostCents
+              : savedPurchaseCostCents;
+
+    const minimumSellingPriceCents = Math.max(
+        effectivePurchaseCostCents,
+        latestUnitCostCents
+    );
+
+    const sellingPriceBelowCost =
+        hasSellingPrice &&
+        enteredPriceCents < minimumSellingPriceCents;
+
+    const pricingWarning = sellingPriceBelowCost
+        ? `Selling price cannot be lower than the required purchase cost of ${formatCurrency(
+              minimumSellingPriceCents / 100
+          )}.`
+        : "";
 
     const fieldError = (field) =>
         validationErrors[field] || errors[field];
@@ -76,11 +131,17 @@ export default function EditProductModal({
         });
 
         clearErrors(field);
-    };
 
-    // ========================================
-    // POPULATE FORM
-    // ========================================
+        if (field === "purchase_cost") {
+            clearErrors("price");
+
+            setValidationErrors((previous) => {
+                const next = { ...previous };
+                delete next.price;
+                return next;
+            });
+        }
+    };
 
     useEffect(() => {
         if (!isOpen || !product) return;
@@ -88,10 +149,17 @@ export default function EditProductModal({
         setData({
             sku: product.sku ?? "",
             name: product.name ?? "",
-            category_id: product.category_id
-                ? String(product.category_id)
-                : "",
+            category_id:
+                product.category_id === null ||
+                product.category_id === undefined
+                    ? ""
+                    : String(product.category_id),
             description: product.description ?? "",
+            purchase_cost:
+                product.purchase_cost === null ||
+                product.purchase_cost === undefined
+                    ? ""
+                    : String(product.purchase_cost),
             price: String(product.price ?? ""),
             unit_of_measure:
                 product.unit_of_measure ?? "pcs",
@@ -105,19 +173,11 @@ export default function EditProductModal({
         setValidationErrors({});
     }, [isOpen, product?.id]);
 
-    // ========================================
-    // RESET FORM
-    // ========================================
-
     const resetForm = () => {
         reset();
         clearErrors();
         setValidationErrors({});
     };
-
-    // ========================================
-    // CLOSE MODAL
-    // ========================================
 
     const handleClose = () => {
         if (processing) return;
@@ -126,20 +186,15 @@ export default function EditProductModal({
         onClose();
     };
 
-    // ========================================
-    // CLIENT-SIDE VALIDATION
-    // ========================================
-
     const validateForm = () => {
         const nextErrors = {};
 
         const name = data.name.trim();
         const sku = data.sku.trim();
         const description = data.description.trim();
-        const price = data.price.trim();
-        const reorderLevel = data.reorder_level.trim();
-
-        // PRODUCT NAME
+        const price = String(data.price).trim();
+        const purchaseCost = String(data.purchase_cost).trim();
+        const reorderLevel = String(data.reorder_level).trim();
 
         if (!name) {
             nextErrors.name = "Product name is required.";
@@ -151,16 +206,12 @@ export default function EditProductModal({
                 "Product name cannot exceed 255 characters.";
         }
 
-        // SKU
-
         if (!sku) {
             nextErrors.sku = "Product SKU is required.";
         } else if (sku.length > 50) {
             nextErrors.sku =
                 "SKU cannot exceed 50 characters.";
         }
-
-        // CATEGORY
 
         if (
             data.category_id !== "" &&
@@ -176,26 +227,27 @@ export default function EditProductModal({
                 "Please select a valid category.";
         }
 
-        // DESCRIPTION
-
         if (description.length > 5000) {
             nextErrors.description =
                 "Description cannot exceed 5000 characters.";
         }
 
-        // SELLING PRICE
+        if (purchaseCost !== "" && !hasPurchaseCost) {
+            nextErrors.purchase_cost =
+                "Enter a valid purchase cost greater than zero, with up to 2 decimal places.";
+        }
 
         if (!price) {
             nextErrors.price = "Selling price is required.";
-        } else if (!PRICE_PATTERN.test(price)) {
+        } else if (
+            enteredPriceCents === null ||
+            enteredPriceCents > 9999999999
+        ) {
             nextErrors.price =
-                "Enter a valid price with up to 2 decimal places.";
-        } else if (Number(price) > 99999999.99) {
-            nextErrors.price =
-                "Selling price exceeds the allowed limit.";
+                "Enter a valid selling price up to ₱99,999,999.99 with at most 2 decimal places.";
+        } else if (sellingPriceBelowCost) {
+            nextErrors.price = pricingWarning;
         }
-
-        // UNIT OF MEASUREMENT
 
         if (!data.unit_of_measure) {
             nextErrors.unit_of_measure =
@@ -209,20 +261,16 @@ export default function EditProductModal({
                 "Please select a valid unit of measurement.";
         }
 
-        // REORDER LEVEL
-
         if (!reorderLevel) {
             nextErrors.reorder_level =
                 "Reorder level is required.";
-        } else if (!QUANTITY_PATTERN.test(reorderLevel)) {
+        } else if (
+            !QUANTITY_PATTERN.test(reorderLevel) ||
+            Number(reorderLevel) > 999999999.999
+        ) {
             nextErrors.reorder_level =
-                "Enter a valid quantity with up to 3 decimal places.";
-        } else if (Number(reorderLevel) > 999999999.999) {
-            nextErrors.reorder_level =
-                "Reorder level exceeds the allowed limit.";
+                "Enter a valid reorder level with up to 3 decimal places.";
         }
-
-        // PRODUCT STATUS
 
         if (typeof data.is_active !== "boolean") {
             nextErrors.is_active =
@@ -233,10 +281,6 @@ export default function EditProductModal({
 
         return Object.keys(nextErrors).length === 0;
     };
-
-    // ========================================
-    // UPDATE PRODUCT
-    // ========================================
 
     const handleSubmit = (event) => {
         event?.preventDefault();
@@ -249,25 +293,20 @@ export default function EditProductModal({
 
         transform((formData) => ({
             ...formData,
-
             sku: formData.sku.trim(),
-
             name: formData.name.trim(),
-
             category_id: formData.category_id || null,
-
             description:
                 formData.description.trim() || null,
-
-            price: formData.price.trim(),
-
+            purchase_cost:
+                String(formData.purchase_cost).trim() || null,
+            price: String(formData.price).trim(),
             reorder_level:
-                formData.reorder_level.trim(),
+                String(formData.reorder_level).trim(),
         }));
 
         put(`/inventory/products/${product.id}`, {
             preserveScroll: true,
-
             onSuccess: () => {
                 resetForm();
                 onClose();
@@ -275,10 +314,6 @@ export default function EditProductModal({
             },
         });
     };
-
-    // ========================================
-    // CURRENT CATEGORY FALLBACK
-    // ========================================
 
     const currentCategory = product?.category;
 
@@ -289,10 +324,6 @@ export default function EditProductModal({
                 Number(category.id) ===
                 Number(product.category_id)
         );
-
-    // ========================================
-    // RENDER
-    // ========================================
 
     return (
         <>
@@ -308,10 +339,6 @@ export default function EditProductModal({
                 submitLabel="Save Changes"
                 isSubmitting={processing}
             >
-                {/* ========================================
-                    PRODUCT INFORMATION
-                ======================================== */}
-
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
@@ -322,8 +349,6 @@ export default function EditProductModal({
                             Update the details used to identify this product.
                         </p>
                     </div>
-
-                    {/* PRODUCT NAME */}
 
                     <div className="sc-form-group">
                         <label
@@ -346,30 +371,17 @@ export default function EditProductModal({
                                 updateField("name", event.target.value)
                             }
                             aria-invalid={Boolean(fieldError("name"))}
-                            aria-describedby={
-                                fieldError("name")
-                                    ? "edit-product-name-error"
-                                    : undefined
-                            }
                             required
                         />
 
                         {fieldError("name") && (
-                            <p
-                                id="edit-product-name-error"
-                                className="sc-form-error"
-                                role="alert"
-                            >
+                            <p className="sc-form-error" role="alert">
                                 {fieldError("name")}
                             </p>
                         )}
                     </div>
 
-                    {/* SKU AND CATEGORY */}
-
                     <div className="sc-form-row">
-                        {/* SKU */}
-
                         <div className="sc-form-group">
                             <label
                                 htmlFor="edit-product-sku"
@@ -399,8 +411,6 @@ export default function EditProductModal({
                                 </p>
                             )}
                         </div>
-
-                        {/* CATEGORY */}
 
                         <div className="sc-form-group">
                             <label
@@ -456,15 +466,12 @@ export default function EditProductModal({
                         </div>
                     </div>
 
-                    {/* DESCRIPTION */}
-
                     <div className="sc-form-group">
                         <label
                             htmlFor="edit-product-description"
                             className="sc-form-label"
                         >
                             Description
-
                             <span className="sc-form-optional">
                                 Optional
                             </span>
@@ -496,10 +503,6 @@ export default function EditProductModal({
                     </div>
                 </div>
 
-                {/* ========================================
-                    INVENTORY MEASUREMENT
-                ======================================== */}
-
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
@@ -513,8 +516,6 @@ export default function EditProductModal({
                     </div>
 
                     <div className="sc-form-row">
-                        {/* UNIT OF MEASUREMENT */}
-
                         <div className="sc-form-group">
                             <label
                                 htmlFor="edit-product-unit"
@@ -559,8 +560,6 @@ export default function EditProductModal({
                                 </p>
                             )}
                         </div>
-
-                        {/* REORDER LEVEL */}
 
                         <div className="sc-form-group">
                             <label
@@ -630,10 +629,6 @@ export default function EditProductModal({
                     </div>
                 </div>
 
-                {/* ========================================
-                    PRICING
-                ======================================== */}
-
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
                         <h3 className="sc-form-section-title">
@@ -641,9 +636,82 @@ export default function EditProductModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Update the selling price for this product.
+                            Selling price must be at least the required
+                            purchase cost.
                         </p>
                     </div>
+
+                    <div className="sc-form-group">
+                        <label
+                            htmlFor="edit-product-purchase-cost"
+                            className="sc-form-label"
+                        >
+                            Supplier Purchase Cost
+                            <span className="sc-form-optional">
+                                Optional for existing products
+                            </span>
+                        </label>
+
+                        <div className="sc-form-price">
+                            <span className="sc-form-currency">
+                                ₱
+                            </span>
+
+                            <input
+                                id="edit-product-purchase-cost"
+                                type="number"
+                                className="sc-form-price-input"
+                                placeholder="0.00"
+                                min="0.01"
+                                max="99999999.99"
+                                step="0.01"
+                                value={data.purchase_cost}
+                                onChange={(event) =>
+                                    updateField(
+                                        "purchase_cost",
+                                        event.target.value
+                                    )
+                                }
+                                aria-invalid={Boolean(
+                                    fieldError("purchase_cost")
+                                )}
+                            />
+                        </div>
+
+                        <p className="sc-form-help">
+                            Initial supplier purchase cost. Actual
+                            delivery costs are recorded in Stock In.
+                            Leaving this blank retains the saved cost.
+                        </p>
+
+                        {fieldError("purchase_cost") && (
+                            <p className="sc-form-error" role="alert">
+                                {fieldError("purchase_cost")}
+                            </p>
+                        )}
+                    </div>
+
+                    {latestUnitCostCents > 0 && (
+                        <p className="sc-form-help">
+                            Latest Stock In Unit Cost:{" "}
+                            <strong>
+                                {formatCurrency(
+                                    latestUnitCostCents / 100
+                                )}
+                            </strong>
+                        </p>
+                    )}
+
+                    {minimumSellingPriceCents > 0 && (
+                        <p className="sc-form-help">
+                            Minimum Allowed Selling Price:{" "}
+                            <strong>
+                                {formatCurrency(
+                                    minimumSellingPriceCents / 100
+                                )}
+                            </strong>
+                        </p>
+                    )}
 
                     <div className="sc-form-group">
                         <label
@@ -651,7 +719,6 @@ export default function EditProductModal({
                             className="sc-form-label"
                         >
                             Selling Price
-
                             <span className="sc-form-required">*</span>
                         </label>
 
@@ -676,7 +743,8 @@ export default function EditProductModal({
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    fieldError("price")
+                                    fieldError("price") ||
+                                    sellingPriceBelowCost
                                 )}
                                 required
                             />
@@ -687,17 +755,43 @@ export default function EditProductModal({
                             places.
                         </p>
 
-                        {fieldError("price") && (
-                            <p className="sc-form-error" role="alert">
-                                {fieldError("price")}
+                        {sellingPriceBelowCost && (
+                            <p
+                                className="sc-form-error"
+                                role="alert"
+                                style={{
+                                    color: "#dc2626",
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {pricingWarning}
                             </p>
                         )}
+
+                        {fieldError("price") &&
+                            fieldError("price") !== pricingWarning && (
+                                <p className="sc-form-error" role="alert">
+                                    {fieldError("price")}
+                                </p>
+                            )}
+
+                        {!sellingPriceBelowCost &&
+                            hasSellingPrice &&
+                            hasPurchaseCost && (
+                                <p className="sc-form-help">
+                                    Gross profit per unit based on
+                                    initial purchase cost:{" "}
+                                    <strong>
+                                        {formatCurrency(
+                                            (enteredPriceCents -
+                                                enteredPurchaseCostCents) /
+                                                100
+                                        )}
+                                    </strong>
+                                </p>
+                            )}
                     </div>
                 </div>
-
-                {/* ========================================
-                    AVAILABILITY
-                ======================================== */}
 
                 <div className="sc-form-section">
                     <div className="sc-form-section-header">
@@ -716,7 +810,6 @@ export default function EditProductModal({
                             className="sc-form-label"
                         >
                             Product Status
-
                             <span className="sc-form-required">*</span>
                         </label>
 
@@ -753,10 +846,6 @@ export default function EditProductModal({
                     </div>
                 </div>
 
-                {/* ========================================
-                    STOCK INFORMATION
-                ======================================== */}
-
                 <div className="sc-form-notice">
                     <div
                         className="sc-form-notice-icon"
@@ -779,18 +868,12 @@ export default function EditProductModal({
                     </div>
                 </div>
 
-                {/* GENERAL SERVER ERRORS */}
-
                 {errors.product && (
                     <p className="sc-form-error" role="alert">
                         {errors.product}
                     </p>
                 )}
             </FormModal>
-
-            {/* ========================================
-                SUCCESS MODAL
-            ======================================== */}
 
             <SuccessModal
                 isOpen={isSuccessModalOpen}

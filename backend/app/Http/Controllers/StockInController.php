@@ -9,104 +9,31 @@ use App\Models\Supplier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class StockInController extends Controller
 {
-    private const COUNT_UNITS = [
-        'pcs',
-        'bottle',
-        'pack',
-        'box',
-    ];
-
-    private const MAX_QUANTITY_MILLI = 999999999999;
-
-    // ========================================
-    // STOCK IN LIST
-    // ========================================
-
-    public function index(Request $request): Response
+    private function toCents(string $amount): int
     {
-        $search = trim((string) $request->query('search', ''));
+        $parts = explode('.', $amount, 2);
 
-        $supplierId = $request->query('supplier');
+        $whole = (int) $parts[0];
 
-        $stockIns = StockMovement::query()
-            ->where('type', 'stock_in')
-            ->with([
-                'product:id,name,sku,unit_of_measure',
-                'user:id,name',
-                'stockInReceipt.supplier:id,name',
-            ])
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($query) use ($search) {
-                    $query->whereHas('product', function ($productQuery) use ($search) {
-                        $productQuery
-                            ->where('name', 'like', "%{$search}%")
-                            ->orWhere('sku', 'like', "%{$search}%");
-                    })->orWhereHas('stockInReceipt', function ($receiptQuery) use ($search) {
-                        $receiptQuery->where(
-                            'reference_number',
-                            'like',
-                            "%{$search}%"
-                        );
-                    });
-                });
-            })
-            ->when(
-                filled($supplierId),
-                fn ($query) => $query->whereHas(
-                    'stockInReceipt',
-                    fn ($receiptQuery) =>
-                        $receiptQuery->where('supplier_id', $supplierId)
-                )
-            )
-            ->orderByDesc('id')
-            ->paginate(10)
-            ->withQueryString();
+        $fraction = str_pad(
+            $parts[1] ?? '',
+            2,
+            '0',
+            STR_PAD_RIGHT
+        );
 
-        $products = Product::query()
-            ->whereNull('archived_at')
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get([
-                'id',
-                'name',
-                'sku',
-                'quantity',
-                'unit_of_measure',
-            ]);
-
-        $suppliers = Supplier::query()
-            ->orderBy('name')
-            ->get([
-                'id',
-                'name',
-                'is_active',
-            ]);
-
-        return Inertia::render('Inventory/StockIn/Index', [
-            'stockIns' => $stockIns,
-            'products' => $products,
-            'suppliers' => $suppliers,
-            'filters' => [
-                'search' => $search,
-                'supplier' => $supplierId,
-            ],
-        ]);
+        return ($whole * 100) + (int) $fraction;
     }
 
-    // ========================================
-    // DECIMAL HELPERS
-    // ========================================
-
-    private function toMilli(string $value): int
+    private function toThousandths(string $quantity): int
     {
-        $parts = explode('.', $value, 2);
+        $parts = explode('.', $quantity, 2);
 
         $whole = (int) $parts[0];
 
@@ -120,22 +47,71 @@ class StockInController extends Controller
         return ($whole * 1000) + (int) $fraction;
     }
 
-    private function fromMilli(int $value): string
+    private function formatQuantity(int $quantity): string
     {
-        $whole = intdiv($value, 1000);
-        $fraction = $value % 1000;
-
-        return $whole . '.' . str_pad(
-            (string) $fraction,
+        return number_format(
+            $quantity / 1000,
             3,
-            '0',
-            STR_PAD_LEFT
+            '.',
+            ''
         );
     }
 
-    // ========================================
-    // SAVE STOCK IN
-    // ========================================
+    public function index(Request $request): Response
+    {
+        $search = trim(
+            (string) $request->query('search', '')
+        );
+
+        $stockIns = StockMovement::query()
+            ->with([
+                'product:id,sku,name,unit_of_measure',
+                'stockInReceipt',
+                'stockInReceipt.supplier',
+                'user:id,name',
+            ])
+            ->where('type', 'in')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas(
+                    'product',
+                    function ($productQuery) use ($search) {
+                        $productQuery
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('sku', 'like', "%{$search}%");
+                    }
+                );
+            })
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        $products = Product::query()
+            ->whereNull('archived_at')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'sku',
+                'name',
+                'price',
+                'quantity',
+                'unit_of_measure',
+            ]);
+
+        $suppliers = Supplier::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Inventory/StockIn/Index', [
+            'stockIns' => $stockIns,
+            'products' => $products,
+            'suppliers' => $suppliers,
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
+    }
 
     public function store(Request $request): RedirectResponse
     {
@@ -143,16 +119,13 @@ class StockInController extends Controller
             'product_id' => [
                 'required',
                 'integer',
-                Rule::exists('products', 'id'),
+                'exists:products,id',
             ],
-
             'supplier_id' => [
-                'required',
+                'nullable',
                 'integer',
-                Rule::exists('suppliers', 'id')
-                    ->where('is_active', true),
+                'exists:suppliers,id',
             ],
-
             'quantity' => [
                 'required',
                 'numeric',
@@ -160,151 +133,206 @@ class StockInController extends Controller
                 'max:999999999.999',
                 'decimal:0,3',
             ],
-
-            'received_at' => [
+            'unit_cost' => [
                 'required',
-                'date_format:Y-m-d',
-                'before_or_equal:today',
+                'numeric',
+                'gt:0',
+                'max:99999999.99',
+                'decimal:0,2',
             ],
-
-            'reason' => [
+            'reference_number' => [
                 'nullable',
                 'string',
-                'max:2000',
+                'max:100',
             ],
+            'received_at' => [
+                'required',
+                'date',
+            ],
+            'notes' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+        ], [
+            'product_id.required' =>
+                'Please select a product.',
+            'product_id.exists' =>
+                'The selected product does not exist.',
+            'quantity.required' =>
+                'Please enter the received quantity.',
+            'quantity.gt' =>
+                'Received quantity must be greater than zero.',
+            'quantity.decimal' =>
+                'Quantity can have up to 3 decimal places.',
+            'unit_cost.required' =>
+                'Please enter the supplier unit cost.',
+            'unit_cost.gt' =>
+                'Unit cost must be greater than zero.',
+            'unit_cost.decimal' =>
+                'Unit cost can have up to 2 decimal places.',
         ]);
 
-        $quantityText = trim(
-            (string) $request->input('quantity', '')
-        );
-
-        if (
-            !preg_match(
-                '/^(?:0|[1-9][0-9]{0,8})(?:\.[0-9]{1,3})?$/',
-                $quantityText
-            )
-        ) {
-            throw ValidationException::withMessages([
-                'quantity' =>
-                    'Enter a valid quantity with up to 3 decimal places.',
-            ]);
-        }
-
-        $receivedMilli = $this->toMilli($quantityText);
-
-        if ($receivedMilli <= 0) {
-            throw ValidationException::withMessages([
-                'quantity' =>
-                    'Received quantity must be greater than zero.',
-            ]);
-        }
-
-        DB::transaction(function () use (
-            $validated,
-            $receivedMilli
-        ) {
-            // Lock product to protect its current stock.
-
+        DB::transaction(function () use ($validated) {
             $product = Product::query()
                 ->whereKey($validated['product_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (!$product->is_active || $product->archived_at !== null) {
-                throw ValidationException::withMessages([
-                    'product_id' =>
-                        'Please select an active, non-archived product.',
-                ]);
-            }
-
-            // Confirm the selected supplier is still active.
-
-            $supplier = Supplier::query()
-                ->whereKey($validated['supplier_id'])
-                ->where('is_active', true)
-                ->first();
-
-            if (!$supplier) {
-                throw ValidationException::withMessages([
-                    'supplier_id' =>
-                        'Please select an active supplier.',
-                ]);
-            }
-
-            // Count-based products must use whole numbers.
-
             if (
-                in_array(
-                    $product->unit_of_measure,
-                    self::COUNT_UNITS,
-                    true
-                ) &&
-                $receivedMilli % 1000 !== 0
+                $product->archived_at !== null ||
+                !$product->is_active
             ) {
                 throw ValidationException::withMessages([
-                    'quantity' =>
-                        'This product uses whole units. Enter a whole number.',
+                    'product_id' =>
+                        'This product is not available for Stock In.',
                 ]);
             }
 
-            $beforeMilli = $this->toMilli(
+            $unitCostCents = $this->toCents(
+                (string) $validated['unit_cost']
+            );
+
+            $sellingPriceCents = $this->toCents(
+                (string) $product->price
+            );
+
+            if ($unitCostCents > $sellingPriceCents) {
+                throw ValidationException::withMessages([
+                    'unit_cost' =>
+                        'Unit cost cannot exceed the product selling price of ₱' .
+                        number_format(
+                            $sellingPriceCents / 100,
+                            2
+                        ) .
+                        '.',
+                ]);
+            }
+
+            if (
+                isset($validated['supplier_id']) &&
+                $validated['supplier_id'] !== null
+            ) {
+                $supplier = Supplier::query()
+                    ->whereKey($validated['supplier_id'])
+                    ->first();
+
+                if (!$supplier || !$supplier->is_active) {
+                    throw ValidationException::withMessages([
+                        'supplier_id' =>
+                            'Please select an active supplier.',
+                    ]);
+                }
+            }
+
+            $quantityBefore = $this->toThousandths(
                 (string) $product->quantity
             );
 
-            $afterMilli = $beforeMilli + $receivedMilli;
+            $quantityChange = $this->toThousandths(
+                (string) $validated['quantity']
+            );
 
-            if ($afterMilli > self::MAX_QUANTITY_MILLI) {
+            $quantityAfter =
+                $quantityBefore + $quantityChange;
+
+            if ($quantityAfter > 999999999999) {
                 throw ValidationException::withMessages([
                     'quantity' =>
-                        'The resulting stock quantity exceeds the allowed limit.',
+                        'Stock In would exceed the maximum inventory quantity.',
                 ]);
             }
 
-            $before = $this->fromMilli($beforeMilli);
-            $change = $this->fromMilli($receivedMilli);
-            $after = $this->fromMilli($afterMilli);
+            if (
+                $quantityChange >
+                intdiv(PHP_INT_MAX - 500, $unitCostCents)
+            ) {
+                throw ValidationException::withMessages([
+                    'quantity' =>
+                        'The total stock cost exceeds the supported limit.',
+                ]);
+            }
 
-            // Update current inventory.
+            $totalCostNumerator =
+                $quantityChange * $unitCostCents;
 
-            $product->quantity = $after;
-            $product->save();
+            $totalCostCents = intdiv(
+                $totalCostNumerator + 500,
+                1000
+            );
 
-            // Create permanent stock movement history.
+            $totalCost = number_format(
+                $totalCostCents / 100,
+                2,
+                '.',
+                ''
+            );
 
-            $movement = StockMovement::create([
-                'product_id' => $product->id,
-                'user_id' => auth()->id(),
-                'type' => 'stock_in',
-                'quantity_change' => $change,
-                'quantity_before' => $before,
-                'quantity_after' => $after,
-                'reason' => $validated['reason'] ?? null,
-            ]);
+            $movement = new StockMovement();
 
-            // Create supplier and delivery receipt details.
+            $movement->product_id = $product->id;
+            $movement->user_id = auth()->id();
+            $movement->type = 'in';
 
-            $receipt = StockInReceipt::create([
-                'stock_movement_id' => $movement->id,
-                'supplier_id' => $supplier->id,
-                'reference_number' =>
-                    'SI-' . str_pad(
-                        (string) $movement->id,
-                        6,
-                        '0',
-                        STR_PAD_LEFT
-                    ),
-                'received_at' => $validated['received_at'],
-            ]);
+            $movement->quantity_change = $this->formatQuantity(
+                $quantityChange
+            );
 
-            // Associate the movement with its receipt.
+            $movement->quantity_before = $this->formatQuantity(
+                $quantityBefore
+            );
 
-            $movement->reference_type = 'stock_in_receipt';
-            $movement->reference_id = $receipt->id;
+            $movement->quantity_after = $this->formatQuantity(
+                $quantityAfter
+            );
+
+            $movement->reason =
+                $validated['notes'] ?? null;
+
             $movement->save();
+
+            $receipt = new StockInReceipt();
+
+            $receipt->stock_movement_id = $movement->id;
+
+            $receipt->supplier_id =
+                $validated['supplier_id'] ?? null;
+
+           $referenceNumber = trim(
+                (string) ($validated['reference_number'] ?? '')
+            );
+
+            if ($referenceNumber === '') {
+                $referenceNumber = 'SI-' .
+                    now()->format('YmdHis') .
+                    '-' .
+                    $movement->id;
+            }
+
+            $receipt->reference_number = $referenceNumber;
+
+            $receipt->received_at =
+                $validated['received_at'];
+
+            $receipt->unit_cost =
+                $validated['unit_cost'];
+
+            $receipt->total_cost = $totalCost;
+
+            $receipt->save();
+
+            $product->quantity = $this->formatQuantity(
+                $quantityAfter
+            );
+
+            $product->save();
         }, 3);
 
         return redirect()
             ->route('inventory.stock-in.index')
-            ->with('success', 'Stock received successfully.');
+            ->with(
+                'success',
+                'Stock In recorded successfully.'
+            );
     }
 }

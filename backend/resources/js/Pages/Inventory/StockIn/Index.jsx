@@ -27,6 +27,27 @@ const formatQuantity = (quantity, unit = "pcs") => {
 };
 
 // ========================================
+// FORMAT CURRENCY
+// ========================================
+
+const formatCurrency = (value) => {
+    if (value === null || value === undefined || value === "") {
+        return "—";
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) return "—";
+
+    return number.toLocaleString("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+};
+
+// ========================================
 // FORMAT DATE
 // ========================================
 
@@ -425,6 +446,8 @@ export default function Index({
                                     <th>SKU</th>
                                     <th>SUPPLIER</th>
                                     <th>QUANTITY</th>
+                                    <th>UNIT COST</th>
+                                    <th>TOTAL COST</th>
                                     <th>RECEIVED BY</th>
                                     <th>ACTIONS</th>
                                 </tr>
@@ -477,6 +500,22 @@ export default function Index({
                                                     {unit}
                                                 </td>
 
+                                                {/* UNIT COST */}
+
+                                                <td>
+                                                    {formatCurrency(
+                                                        receipt?.unit_cost
+                                                    )}
+                                                </td>
+
+                                                {/* TOTAL PURCHASE COST */}
+
+                                                <td>
+                                                    {formatCurrency(
+                                                        receipt?.total_cost
+                                                    )}
+                                                </td>
+
                                                 <td>
                                                     {movement.user?.name ??
                                                         "—"}
@@ -518,7 +557,7 @@ export default function Index({
                                 ) : (
                                     <tr>
                                         <td
-                                            colSpan={8}
+                                            colSpan={10}
                                             className="products-empty"
                                         >
                                             No Stock In transactions found.

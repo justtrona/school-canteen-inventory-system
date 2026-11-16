@@ -13,6 +13,15 @@ const formatQuantity = (value, unit) => {
     });
 };
 
+const formatCurrency = (value) => {
+    return Number(value ?? 0).toLocaleString("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+};
+
 const getToday = () => {
     const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Manila",
@@ -48,12 +57,14 @@ export default function AddStockInModal({
         product_id: "",
         supplier_id: "",
         quantity: "",
+        unit_cost: "",
         received_at: getToday(),
         reason: "",
     });
 
     const selectedProduct = products.find(
-        (product) => String(product.id) === String(data.product_id)
+        (product) =>
+            String(product.id) === String(data.product_id)
     );
 
     const unit = selectedProduct?.unit_of_measure ?? "";
@@ -61,6 +72,49 @@ export default function AddStockInModal({
     const activeSuppliers = suppliers.filter(
         (supplier) => supplier.is_active
     );
+
+    const quantityNumber = Number(data.quantity);
+    const unitCostNumber = Number(data.unit_cost);
+
+    const sellingPrice =
+        selectedProduct?.price !== null &&
+        selectedProduct?.price !== undefined
+            ? Number(selectedProduct.price)
+            : null;
+
+    const hasSellingPrice =
+        sellingPrice !== null &&
+        Number.isFinite(sellingPrice);
+
+    const validUnitCost =
+        /^\d+(?:\.\d{1,2})?$/.test(
+            String(data.unit_cost)
+        ) &&
+        Number.isFinite(unitCostNumber) &&
+        unitCostNumber > 0 &&
+        unitCostNumber <= 999999999.99;
+
+    const costExceedsSellingPrice =
+        Boolean(selectedProduct) &&
+        hasSellingPrice &&
+        validUnitCost &&
+        unitCostNumber > sellingPrice;
+
+    const pricingWarning = costExceedsSellingPrice
+        ? `Unit cost cannot exceed the product selling price of ${formatCurrency(sellingPrice)}.`
+        : "";
+
+    const hasValidCalculation =
+        data.quantity !== "" &&
+        validUnitCost &&
+        Number.isFinite(quantityNumber) &&
+        quantityNumber > 0;
+
+    const totalCost = hasValidCalculation
+        ? Math.round(
+              (quantityNumber * unitCostNumber + Number.EPSILON) * 100
+          ) / 100
+        : 0;
 
     const fieldError = (name) =>
         localErrors[name] || errors[name];
@@ -72,6 +126,27 @@ export default function AddStockInModal({
         setLocalErrors((previous) => {
             const next = { ...previous };
             delete next[name];
+            return next;
+        });
+    };
+
+    const handleProductChange = (event) => {
+        const productId = event.target.value;
+
+        setData((previous) => ({
+            ...previous,
+            product_id: productId,
+            quantity: "",
+            unit_cost: "",
+        }));
+
+        clearErrors("product_id", "quantity", "unit_cost");
+
+        setLocalErrors((previous) => {
+            const next = { ...previous };
+            delete next.product_id;
+            delete next.quantity;
+            delete next.unit_cost;
             return next;
         });
     };
@@ -92,21 +167,34 @@ export default function AddStockInModal({
 
     const validate = () => {
         const nextErrors = {};
-        const quantity = data.quantity.trim();
+
+        const quantity = String(data.quantity).trim();
+        const unitCost = String(data.unit_cost).trim();
 
         if (!selectedProduct) {
             nextErrors.product_id = "Please select a product.";
         }
 
-        if (!data.supplier_id) {
-            nextErrors.supplier_id = "Please select a supplier.";
+        if (
+            !activeSuppliers.some(
+                (supplier) =>
+                    String(supplier.id) ===
+                    String(data.supplier_id)
+            )
+        ) {
+            nextErrors.supplier_id =
+                "Please select an active supplier.";
         }
 
         if (!quantity) {
-            nextErrors.quantity = "Received quantity is required.";
+            nextErrors.quantity =
+                "Received quantity is required.";
         } else if (
-            !/^(?:0|[1-9]\d{0,8})(?:\.\d{1,3})?$/.test(quantity) ||
-            Number(quantity) <= 0
+            !/^(?:0|[1-9]\d{0,8})(?:\.\d{1,3})?$/.test(
+                quantity
+            ) ||
+            Number(quantity) <= 0 ||
+            Number(quantity) > 999999999.999
         ) {
             nextErrors.quantity =
                 "Enter a positive quantity with up to 3 decimal places.";
@@ -118,8 +206,21 @@ export default function AddStockInModal({
                 `Quantity for ${unit} must be a whole number.`;
         }
 
+        if (!unitCost) {
+            nextErrors.unit_cost = "Unit cost is required.";
+        } else if (!validUnitCost) {
+            nextErrors.unit_cost =
+                "Enter a valid unit cost greater than zero, with up to 2 decimal places.";
+        } else if (!hasSellingPrice) {
+            nextErrors.unit_cost =
+                "The selected product does not have a valid selling price.";
+        } else if (costExceedsSellingPrice) {
+            nextErrors.unit_cost = pricingWarning;
+        }
+
         if (!data.received_at) {
-            nextErrors.received_at = "Date received is required.";
+            nextErrors.received_at =
+                "Date received is required.";
         } else if (data.received_at > getToday()) {
             nextErrors.received_at =
                 "Date received cannot be in the future.";
@@ -142,7 +243,6 @@ export default function AddStockInModal({
 
         post("/inventory/stock-in", {
             preserveScroll: true,
-
             onSuccess: () => {
                 resetForm();
                 onClose();
@@ -182,28 +282,24 @@ export default function AddStockInModal({
                             htmlFor="stock-in-product"
                         >
                             Product
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <select
                             id="stock-in-product"
                             className="sc-form-select"
                             value={data.product_id}
-                            onChange={(event) => {
-                                updateField(
-                                    "product_id",
-                                    event.target.value
-                                );
-                                setData((previous) => ({
-                                    ...previous,
-                                    product_id: event.target.value,
-                                    quantity: "",
-                                }));
-                            }}
-                            aria-invalid={Boolean(fieldError("product_id"))}
+                            onChange={handleProductChange}
+                            aria-invalid={Boolean(
+                                fieldError("product_id")
+                            )}
                             required
                         >
-                            <option value="">Select a product</option>
+                            <option value="">
+                                Select a product
+                            </option>
 
                             {products.map((product) => (
                                 <option
@@ -265,7 +361,9 @@ export default function AddStockInModal({
                             htmlFor="stock-in-supplier"
                         >
                             Supplier
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <select
@@ -278,10 +376,14 @@ export default function AddStockInModal({
                                     event.target.value
                                 )
                             }
-                            aria-invalid={Boolean(fieldError("supplier_id"))}
+                            aria-invalid={Boolean(
+                                fieldError("supplier_id")
+                            )}
                             required
                         >
-                            <option value="">Select a supplier</option>
+                            <option value="">
+                                Select a supplier
+                            </option>
 
                             {activeSuppliers.map((supplier) => (
                                 <option
@@ -307,7 +409,9 @@ export default function AddStockInModal({
                                 htmlFor="stock-in-quantity"
                             >
                                 Quantity Received
-                                <span className="sc-form-required">*</span>
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <input
@@ -358,7 +462,9 @@ export default function AddStockInModal({
                                 htmlFor="stock-in-date"
                             >
                                 Date Received
-                                <span className="sc-form-required">*</span>
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <input
@@ -411,7 +517,9 @@ export default function AddStockInModal({
                                     event.target.value
                                 )
                             }
-                            aria-invalid={Boolean(fieldError("reason"))}
+                            aria-invalid={Boolean(
+                                fieldError("reason")
+                            )}
                         />
 
                         {fieldError("reason") && (
@@ -419,6 +527,127 @@ export default function AddStockInModal({
                                 {fieldError("reason")}
                             </p>
                         )}
+                    </div>
+                </div>
+
+                <div className="sc-form-section">
+                    <div className="sc-form-section-header">
+                        <h3 className="sc-form-section-title">
+                            Purchase Cost
+                        </h3>
+
+                        <p className="sc-form-section-description">
+                            Record the actual purchase cost of this
+                            delivery.
+                        </p>
+                    </div>
+
+                    <div className="sc-form-group">
+                        <label
+                            className="sc-form-label"
+                            htmlFor="stock-in-unit-cost"
+                        >
+                            Unit Cost (₱)
+                            <span className="sc-form-required">
+                                *
+                            </span>
+                        </label>
+
+                        <input
+                            id="stock-in-unit-cost"
+                            className="sc-form-input"
+                            type="number"
+                            min="0.01"
+                            max="999999999.99"
+                            step="0.01"
+                            placeholder="e.g. 10.00"
+                            value={data.unit_cost}
+                            onChange={(event) =>
+                                updateField(
+                                    "unit_cost",
+                                    event.target.value
+                                )
+                            }
+                            aria-invalid={Boolean(
+                                fieldError("unit_cost") ||
+                                costExceedsSellingPrice
+                            )}
+                            aria-describedby={
+                                costExceedsSellingPrice
+                                    ? "stock-in-pricing-warning"
+                                    : undefined
+                            }
+                            required
+                        />
+
+                        <p className="sc-form-help">
+                            Enter the supplier's purchase cost per{" "}
+                            {unit || "unit"}.
+                        </p>
+
+                        {selectedProduct && hasSellingPrice && (
+                            <p className="sc-form-help">
+                                Product Selling Price:{" "}
+                                <strong>
+                                    {formatCurrency(sellingPrice)}
+                                </strong>
+                            </p>
+                        )}
+
+                        {costExceedsSellingPrice && (
+                            <p
+                                id="stock-in-pricing-warning"
+                                className="sc-form-error"
+                                role="alert"
+                                style={{
+                                    color: "#dc2626",
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {pricingWarning}
+                            </p>
+                        )}
+
+                        {fieldError("unit_cost") &&
+                            fieldError("unit_cost") !==
+                                pricingWarning && (
+                                <p className="sc-form-error">
+                                    {fieldError("unit_cost")}
+                                </p>
+                            )}
+                    </div>
+
+                    <div
+                        className="sc-form-notice"
+                        aria-live="polite"
+                    >
+                        <div
+                            className="sc-form-notice-icon"
+                            aria-hidden="true"
+                        >
+                            ₱
+                        </div>
+
+                        <div className="sc-form-notice-content">
+                            <p className="sc-form-notice-title">
+                                Total Purchase Cost
+                            </p>
+
+                            <p className="sc-form-notice-description">
+                                {formatCurrency(totalCost)}
+                            </p>
+
+                            <p className="sc-form-help">
+                                {hasValidCalculation
+                                    ? `${formatQuantity(
+                                          data.quantity,
+                                          unit
+                                      )} ${unit || "units"} × ${formatCurrency(
+                                          data.unit_cost
+                                      )}`
+                                    : "Enter quantity and unit cost to calculate the total."}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -438,8 +667,10 @@ export default function AddStockInModal({
                         <p className="sc-form-notice-description">
                             Receiving stock increases the product's
                             inventory and creates a permanent stock
-                            movement record. The reference number is
-                            generated automatically.
+                            movement record. The purchase cost is
+                            recorded for this delivery, and the
+                            reference number is generated
+                            automatically.
                         </p>
                     </div>
                 </div>
