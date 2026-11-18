@@ -19,17 +19,34 @@ const UNIT_OPTIONS = [
 const PRICE_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 const QUANTITY_PATTERN = /^\d+(?:\.\d{1,3})?$/;
 
-const toCents = (value) => {
-    const text = String(value ?? "").trim();
+const MAX_PRICE_CENTS = 9999999999;
 
-    if (!PRICE_PATTERN.test(text)) return null;
+const toCents = (value) => {
+    if (
+        value === null ||
+        value === undefined ||
+        String(value).trim() === ""
+    ) {
+        return null;
+    }
+
+    const text = String(value).trim();
+
+    if (!PRICE_PATTERN.test(text)) {
+        return null;
+    }
 
     const [whole, fraction = ""] = text.split(".");
+
     const cents =
         Number(whole) * 100 +
         Number(fraction.padEnd(2, "0"));
 
-    return Number.isSafeInteger(cents) ? cents : null;
+    return Number.isSafeInteger(cents) &&
+        cents >= 0 &&
+        cents <= MAX_PRICE_CENTS
+        ? cents
+        : null;
 };
 
 const formatCurrency = (value) =>
@@ -38,7 +55,7 @@ const formatCurrency = (value) =>
         currency: "PHP",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-    }).format(Number(value) || 0);
+    }).format(value);
 
 export default function EditProductModal({
     isOpen,
@@ -66,60 +83,42 @@ export default function EditProductModal({
         name: "",
         category_id: "",
         description: "",
-        purchase_cost: "",
         price: "",
         unit_of_measure: "pcs",
         reorder_level: "0",
         is_active: true,
     });
 
-    const savedPurchaseCostCents =
-        toCents(product?.purchase_cost) ?? 0;
+    const latestUnitCostCents = toCents(
+        product?.latest_unit_cost
+    );
 
-    const latestUnitCostCents =
-        toCents(product?.latest_unit_cost) ?? 0;
-
-    const enteredPurchaseCostCents =
-        toCents(data.purchase_cost);
+    const hasRecordedPurchaseCost =
+        latestUnitCostCents !== null;
 
     const enteredPriceCents = toCents(data.price);
 
-    const hasPurchaseCost =
-        data.purchase_cost !== "" &&
-        enteredPurchaseCostCents !== null &&
-        enteredPurchaseCostCents > 0 &&
-        enteredPurchaseCostCents <= 9999999999;
-
     const hasSellingPrice =
-        data.price !== "" &&
-        enteredPriceCents !== null &&
-        enteredPriceCents >= 0 &&
-        enteredPriceCents <= 9999999999;
-
-    const effectivePurchaseCostCents =
-        data.purchase_cost === ""
-            ? savedPurchaseCostCents
-            : hasPurchaseCost
-              ? enteredPurchaseCostCents
-              : savedPurchaseCostCents;
-
-    const minimumSellingPriceCents = Math.max(
-        effectivePurchaseCostCents,
-        latestUnitCostCents
-    );
+        enteredPriceCents !== null;
 
     const sellingPriceBelowCost =
+        hasRecordedPurchaseCost &&
         hasSellingPrice &&
-        enteredPriceCents < minimumSellingPriceCents;
+        enteredPriceCents < latestUnitCostCents;
 
     const pricingWarning = sellingPriceBelowCost
-        ? `Selling price cannot be lower than the required purchase cost of ${formatCurrency(
-              minimumSellingPriceCents / 100
+        ? `Selling price cannot be lower than the latest supplier purchase cost of ${formatCurrency(
+              latestUnitCostCents / 100
           )}.`
         : "";
 
+    const estimatedGrossProfitCents =
+        hasRecordedPurchaseCost && hasSellingPrice
+            ? enteredPriceCents - latestUnitCostCents
+            : null;
+
     const fieldError = (field) =>
-        validationErrors[field] || errors[field];
+        validationErrors[field] || errors[field] || "";
 
     const updateField = (field, value) => {
         setData(field, value);
@@ -130,16 +129,8 @@ export default function EditProductModal({
             return next;
         });
 
-        clearErrors(field);
-
-        if (field === "purchase_cost") {
-            clearErrors("price");
-
-            setValidationErrors((previous) => {
-                const next = { ...previous };
-                delete next.price;
-                return next;
-            });
+        if (errors[field]) {
+            clearErrors(field);
         }
     };
 
@@ -155,11 +146,6 @@ export default function EditProductModal({
                     ? ""
                     : String(product.category_id),
             description: product.description ?? "",
-            purchase_cost:
-                product.purchase_cost === null ||
-                product.purchase_cost === undefined
-                    ? ""
-                    : String(product.purchase_cost),
             price: String(product.price ?? ""),
             unit_of_measure:
                 product.unit_of_measure ?? "pcs",
@@ -177,6 +163,7 @@ export default function EditProductModal({
         reset();
         clearErrors();
         setValidationErrors({});
+        transform((formData) => formData);
     };
 
     const handleClose = () => {
@@ -193,8 +180,9 @@ export default function EditProductModal({
         const sku = data.sku.trim();
         const description = data.description.trim();
         const price = String(data.price).trim();
-        const purchaseCost = String(data.purchase_cost).trim();
-        const reorderLevel = String(data.reorder_level).trim();
+        const reorderLevel = String(
+            data.reorder_level
+        ).trim();
 
         if (!name) {
             nextErrors.name = "Product name is required.";
@@ -232,17 +220,10 @@ export default function EditProductModal({
                 "Description cannot exceed 5000 characters.";
         }
 
-        if (purchaseCost !== "" && !hasPurchaseCost) {
-            nextErrors.purchase_cost =
-                "Enter a valid purchase cost greater than zero, with up to 2 decimal places.";
-        }
-
         if (!price) {
-            nextErrors.price = "Selling price is required.";
-        } else if (
-            enteredPriceCents === null ||
-            enteredPriceCents > 9999999999
-        ) {
+            nextErrors.price =
+                "Selling price is required.";
+        } else if (!hasSellingPrice) {
             nextErrors.price =
                 "Enter a valid selling price up to ₱99,999,999.99 with at most 2 decimal places.";
         } else if (sellingPriceBelowCost) {
@@ -254,7 +235,8 @@ export default function EditProductModal({
                 "Please select a unit of measurement.";
         } else if (
             !UNIT_OPTIONS.some(
-                (unit) => unit.value === data.unit_of_measure
+                (unit) =>
+                    unit.value === data.unit_of_measure
             )
         ) {
             nextErrors.unit_of_measure =
@@ -266,6 +248,7 @@ export default function EditProductModal({
                 "Reorder level is required.";
         } else if (
             !QUANTITY_PATTERN.test(reorderLevel) ||
+            !Number.isFinite(Number(reorderLevel)) ||
             Number(reorderLevel) > 999999999.999
         ) {
             nextErrors.reorder_level =
@@ -292,17 +275,19 @@ export default function EditProductModal({
         if (!validateForm()) return;
 
         transform((formData) => ({
-            ...formData,
             sku: formData.sku.trim(),
             name: formData.name.trim(),
-            category_id: formData.category_id || null,
+            category_id:
+                formData.category_id || null,
             description:
                 formData.description.trim() || null,
-            purchase_cost:
-                String(formData.purchase_cost).trim() || null,
             price: String(formData.price).trim(),
-            reorder_level:
-                String(formData.reorder_level).trim(),
+            unit_of_measure:
+                formData.unit_of_measure,
+            reorder_level: String(
+                formData.reorder_level
+            ).trim(),
+            is_active: formData.is_active,
         }));
 
         put(`/inventory/products/${product.id}`, {
@@ -346,7 +331,8 @@ export default function EditProductModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Update the details used to identify this product.
+                            Update the details used to identify
+                            this product.
                         </p>
                     </div>
 
@@ -356,7 +342,9 @@ export default function EditProductModal({
                             className="sc-form-label"
                         >
                             Product Name
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <input
@@ -368,14 +356,22 @@ export default function EditProductModal({
                             maxLength={255}
                             value={data.name}
                             onChange={(event) =>
-                                updateField("name", event.target.value)
+                                updateField(
+                                    "name",
+                                    event.target.value
+                                )
                             }
-                            aria-invalid={Boolean(fieldError("name"))}
+                            aria-invalid={Boolean(
+                                fieldError("name")
+                            )}
                             required
                         />
 
                         {fieldError("name") && (
-                            <p className="sc-form-error" role="alert">
+                            <p
+                                className="sc-form-error"
+                                role="alert"
+                            >
                                 {fieldError("name")}
                             </p>
                         )}
@@ -388,7 +384,9 @@ export default function EditProductModal({
                                 className="sc-form-label"
                             >
                                 SKU
-                                <span className="sc-form-required">*</span>
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <input
@@ -402,11 +400,15 @@ export default function EditProductModal({
                             />
 
                             <p className="sc-form-help">
-                                Automatically generated product identifier.
+                                Automatically generated product
+                                identifier.
                             </p>
 
                             {fieldError("sku") && (
-                                <p className="sc-form-error" role="alert">
+                                <p
+                                    className="sc-form-error"
+                                    role="alert"
+                                >
                                     {fieldError("sku")}
                                 </p>
                             )}
@@ -440,7 +442,9 @@ export default function EditProductModal({
 
                                 {currentCategoryMissing && (
                                     <option
-                                        value={String(product.category_id)}
+                                        value={String(
+                                            product.category_id
+                                        )}
                                     >
                                         {currentCategory?.name ??
                                             "Current category"}
@@ -448,18 +452,25 @@ export default function EditProductModal({
                                     </option>
                                 )}
 
-                                {categories.map((category) => (
-                                    <option
-                                        key={category.id}
-                                        value={String(category.id)}
-                                    >
-                                        {category.name}
-                                    </option>
-                                ))}
+                                {categories.map(
+                                    (category) => (
+                                        <option
+                                            key={category.id}
+                                            value={String(
+                                                category.id
+                                            )}
+                                        >
+                                            {category.name}
+                                        </option>
+                                    )
+                                )}
                             </select>
 
                             {fieldError("category_id") && (
-                                <p className="sc-form-error" role="alert">
+                                <p
+                                    className="sc-form-error"
+                                    role="alert"
+                                >
                                     {fieldError("category_id")}
                                 </p>
                             )}
@@ -496,7 +507,10 @@ export default function EditProductModal({
                         />
 
                         {fieldError("description") && (
-                            <p className="sc-form-error" role="alert">
+                            <p
+                                className="sc-form-error"
+                                role="alert"
+                            >
                                 {fieldError("description")}
                             </p>
                         )}
@@ -510,8 +524,8 @@ export default function EditProductModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Define how this product is measured and
-                            monitored in your inventory.
+                            Define how this product is measured
+                            and monitored in your inventory.
                         </p>
                     </div>
 
@@ -522,7 +536,9 @@ export default function EditProductModal({
                                 className="sc-form-label"
                             >
                                 Unit of Measurement
-                                <span className="sc-form-required">*</span>
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <select
@@ -536,7 +552,9 @@ export default function EditProductModal({
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    fieldError("unit_of_measure")
+                                    fieldError(
+                                        "unit_of_measure"
+                                    )
                                 )}
                                 required
                             >
@@ -551,12 +569,18 @@ export default function EditProductModal({
                             </select>
 
                             <p className="sc-form-help">
-                                Keep one consistent unit for this product.
+                                Keep one consistent unit for
+                                this product.
                             </p>
 
                             {fieldError("unit_of_measure") && (
-                                <p className="sc-form-error" role="alert">
-                                    {fieldError("unit_of_measure")}
+                                <p
+                                    className="sc-form-error"
+                                    role="alert"
+                                >
+                                    {fieldError(
+                                        "unit_of_measure"
+                                    )}
                                 </p>
                             )}
                         </div>
@@ -567,7 +591,9 @@ export default function EditProductModal({
                                 className="sc-form-label"
                             >
                                 Reorder Level
-                                <span className="sc-form-required">*</span>
+                                <span className="sc-form-required">
+                                    *
+                                </span>
                             </label>
 
                             <input
@@ -586,19 +612,26 @@ export default function EditProductModal({
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    fieldError("reorder_level")
+                                    fieldError(
+                                        "reorder_level"
+                                    )
                                 )}
                                 required
                             />
 
                             <p className="sc-form-help">
-                                Minimum stock quantity before replenishment
-                                is needed.
+                                Minimum stock quantity before
+                                replenishment is needed.
                             </p>
 
                             {fieldError("reorder_level") && (
-                                <p className="sc-form-error" role="alert">
-                                    {fieldError("reorder_level")}
+                                <p
+                                    className="sc-form-error"
+                                    role="alert"
+                                >
+                                    {fieldError(
+                                        "reorder_level"
+                                    )}
                                 </p>
                             )}
                         </div>
@@ -618,12 +651,12 @@ export default function EditProductModal({
                             </p>
 
                             <p className="sc-form-notice-description">
-                                Use one consistent measurement unit for
-                                each product. Weight-based and
-                                volume-based products support decimal
-                                quantities. Products with existing
-                                inventory history cannot have their
-                                measurement unit changed.
+                                Use one consistent measurement
+                                unit for each product. Weight-based
+                                and volume-based products support
+                                decimal quantities. Products with
+                                existing inventory history cannot
+                                have their measurement unit changed.
                             </p>
                         </div>
                     </div>
@@ -636,8 +669,10 @@ export default function EditProductModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Selling price must be at least the required
-                            purchase cost.
+                            Supplier purchase cost is automatically
+                            retrieved from Stock In records.
+                            The selling price must not be lower
+                            than the latest recorded cost.
                         </p>
                     </div>
 
@@ -648,7 +683,7 @@ export default function EditProductModal({
                         >
                             Supplier Purchase Cost
                             <span className="sc-form-optional">
-                                Optional for existing products
+                                Read-only
                             </span>
                         </label>
 
@@ -659,55 +694,40 @@ export default function EditProductModal({
 
                             <input
                                 id="edit-product-purchase-cost"
-                                type="number"
+                                type="text"
                                 className="sc-form-price-input"
-                                placeholder="0.00"
-                                min="0.01"
-                                max="99999999.99"
-                                step="0.01"
-                                value={data.purchase_cost}
-                                onChange={(event) =>
-                                    updateField(
-                                        "purchase_cost",
-                                        event.target.value
-                                    )
+                                value={
+                                    hasRecordedPurchaseCost
+                                        ? (
+                                              latestUnitCostCents /
+                                              100
+                                          ).toFixed(2)
+                                        : "Not yet recorded"
                                 }
-                                aria-invalid={Boolean(
-                                    fieldError("purchase_cost")
-                                )}
+                                readOnly
+                                aria-readonly="true"
+                                title="Supplier purchase cost is managed through Stock In."
+                                style={{
+                                    cursor: "not-allowed",
+                                    color: "#64748b",
+                                    backgroundColor: "#f8fafc",
+                                }}
                             />
                         </div>
 
                         <p className="sc-form-help">
-                            Initial supplier purchase cost. Actual
-                            delivery costs are recorded in Stock In.
-                            Leaving this blank retains the saved cost.
+                            {hasRecordedPurchaseCost
+                                ? "This is the latest supplier unit cost recorded through Stock In. It cannot be changed here."
+                                : "No supplier purchase cost has been recorded yet. The cost will appear automatically after the first Stock In transaction."}
                         </p>
-
-                        {fieldError("purchase_cost") && (
-                            <p className="sc-form-error" role="alert">
-                                {fieldError("purchase_cost")}
-                            </p>
-                        )}
                     </div>
 
-                    {latestUnitCostCents > 0 && (
-                        <p className="sc-form-help">
-                            Latest Stock In Unit Cost:{" "}
-                            <strong>
-                                {formatCurrency(
-                                    latestUnitCostCents / 100
-                                )}
-                            </strong>
-                        </p>
-                    )}
-
-                    {minimumSellingPriceCents > 0 && (
+                    {hasRecordedPurchaseCost && (
                         <p className="sc-form-help">
                             Minimum Allowed Selling Price:{" "}
                             <strong>
                                 {formatCurrency(
-                                    minimumSellingPriceCents / 100
+                                    latestUnitCostCents / 100
                                 )}
                             </strong>
                         </p>
@@ -719,7 +739,9 @@ export default function EditProductModal({
                             className="sc-form-label"
                         >
                             Selling Price
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <div className="sc-form-price">
@@ -746,17 +768,23 @@ export default function EditProductModal({
                                     fieldError("price") ||
                                     sellingPriceBelowCost
                                 )}
+                                aria-describedby={
+                                    sellingPriceBelowCost
+                                        ? "edit-product-pricing-warning"
+                                        : undefined
+                                }
                                 required
                             />
                         </div>
 
                         <p className="sc-form-help">
-                            Enter the selling price with up to 2 decimal
-                            places.
+                            Enter the selling price with up to
+                            2 decimal places.
                         </p>
 
                         {sellingPriceBelowCost && (
                             <p
+                                id="edit-product-pricing-warning"
                                 className="sc-form-error"
                                 role="alert"
                                 style={{
@@ -769,27 +797,38 @@ export default function EditProductModal({
                         )}
 
                         {fieldError("price") &&
-                            fieldError("price") !== pricingWarning && (
-                                <p className="sc-form-error" role="alert">
+                            fieldError("price") !==
+                                pricingWarning && (
+                                <p
+                                    className="sc-form-error"
+                                    role="alert"
+                                >
                                     {fieldError("price")}
                                 </p>
                             )}
 
                         {!sellingPriceBelowCost &&
-                            hasSellingPrice &&
-                            hasPurchaseCost && (
+                            estimatedGrossProfitCents !==
+                                null && (
                                 <p className="sc-form-help">
-                                    Gross profit per unit based on
-                                    initial purchase cost:{" "}
+                                    Estimated gross profit per unit
+                                    based on latest supplier cost:{" "}
                                     <strong>
                                         {formatCurrency(
-                                            (enteredPriceCents -
-                                                enteredPurchaseCostCents) /
+                                            estimatedGrossProfitCents /
                                                 100
                                         )}
                                     </strong>
                                 </p>
                             )}
+
+                        {!hasRecordedPurchaseCost && (
+                            <p className="sc-form-help">
+                                Estimated gross profit will be
+                                available once a supplier purchase
+                                cost is recorded through Stock In.
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -800,7 +839,8 @@ export default function EditProductModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Control whether this product can be sold.
+                            Control whether this product can
+                            be sold.
                         </p>
                     </div>
 
@@ -810,7 +850,9 @@ export default function EditProductModal({
                             className="sc-form-label"
                         >
                             Product Status
-                            <span className="sc-form-required">*</span>
+                            <span className="sc-form-required">
+                                *
+                            </span>
                         </label>
 
                         <select
@@ -828,8 +870,13 @@ export default function EditProductModal({
                             )}
                             required
                         >
-                            <option value="1">Active</option>
-                            <option value="0">Inactive</option>
+                            <option value="1">
+                                Active
+                            </option>
+
+                            <option value="0">
+                                Inactive
+                            </option>
                         </select>
 
                         <p className="sc-form-help">
@@ -839,7 +886,10 @@ export default function EditProductModal({
                         </p>
 
                         {fieldError("is_active") && (
-                            <p className="sc-form-error" role="alert">
+                            <p
+                                className="sc-form-error"
+                                role="alert"
+                            >
                                 {fieldError("is_active")}
                             </p>
                         )}
@@ -860,16 +910,20 @@ export default function EditProductModal({
                         </p>
 
                         <p className="sc-form-notice-description">
-                            Current stock is managed separately through
-                            Stock In and Stock Out. Changes to inventory
-                            quantities are recorded in stock movement
-                            history to maintain accurate inventory records.
+                            Current stock is managed separately
+                            through Stock In and Stock Out.
+                            Changes to inventory quantities are
+                            recorded in stock movement history
+                            to maintain accurate inventory records.
                         </p>
                     </div>
                 </div>
 
                 {errors.product && (
-                    <p className="sc-form-error" role="alert">
+                    <p
+                        className="sc-form-error"
+                        role="alert"
+                    >
                         {errors.product}
                     </p>
                 )}
@@ -877,7 +931,9 @@ export default function EditProductModal({
 
             <SuccessModal
                 isOpen={isSuccessModalOpen}
-                onClose={() => setIsSuccessModalOpen(false)}
+                onClose={() =>
+                    setIsSuccessModalOpen(false)
+                }
                 title="Product Updated Successfully!"
                 message="The product information has been updated."
                 buttonLabel="Done"

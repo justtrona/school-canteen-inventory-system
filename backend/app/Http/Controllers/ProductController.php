@@ -20,12 +20,31 @@ class ProductController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $category = $request->query('category');
+
         $status = $request->query('status') === 'archived'
             ? 'archived'
             : 'active';
 
         $products = Product::query()
             ->with('category:id,name')
+            ->addSelect([
+                'latest_unit_cost' => StockInReceipt::query()
+                    ->select('stock_in_receipts.unit_cost')
+                    ->join(
+                        'stock_movements',
+                        'stock_movements.id',
+                        '=',
+                        'stock_in_receipts.stock_movement_id'
+                    )
+                    ->whereColumn(
+                        'stock_movements.product_id',
+                        'products.id'
+                    )
+                    ->whereNotNull('stock_in_receipts.unit_cost')
+                    ->orderByDesc('stock_in_receipts.received_at')
+                    ->orderByDesc('stock_in_receipts.id')
+                    ->limit(1),
+            ])
             ->when(
                 $status === 'archived',
                 fn ($query) => $query->whereNotNull('archived_at'),
@@ -33,13 +52,17 @@ class ProductController extends Controller
             )
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
-                    $query->where('name', 'like', "%{$search}%")
+                    $query
+                        ->where('name', 'like', "%{$search}%")
                         ->orWhere('sku', 'like', "%{$search}%");
                 });
             })
             ->when(
                 filled($category),
-                fn ($query) => $query->where('category_id', $category)
+                fn ($query) => $query->where(
+                    'category_id',
+                    $category
+                )
             )
             ->orderBy('name')
             ->paginate(10)
@@ -48,7 +71,11 @@ class ProductController extends Controller
         $categories = Category::query()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku_prefix']);
+            ->get([
+                'id',
+                'name',
+                'sku_prefix',
+            ]);
 
         return Inertia::render('Inventory/Products/Index', [
             'products' => $products,
@@ -66,15 +93,19 @@ class ProductController extends Controller
     {
         if (!$category->is_active) {
             throw ValidationException::withMessages([
-                'category_id' => 'Please select an active category.',
+                'category_id' =>
+                    'Please select an active category.',
             ]);
         }
 
-        $prefix = strtoupper(trim((string) $category->sku_prefix));
+        $prefix = strtoupper(
+            trim((string) $category->sku_prefix)
+        );
 
         if ($prefix === '') {
             throw ValidationException::withMessages([
-                'category_id' => 'This category does not have an SKU prefix yet.',
+                'category_id' =>
+                    'This category does not have an SKU prefix yet.',
             ]);
         }
 
@@ -83,7 +114,10 @@ class ProductController extends Controller
             ->pluck('sku');
 
         $highestNumber = 0;
-        $pattern = '/^' . preg_quote($prefix, '/') . '-(\d+)$/i';
+
+        $pattern = '/^' .
+            preg_quote($prefix, '/') .
+            '-(\d+)$/i';
 
         foreach ($existingSkus as $existingSku) {
             if (preg_match($pattern, $existingSku, $matches)) {
@@ -123,6 +157,22 @@ class ProductController extends Controller
         ]);
     }
 
+    private function toCents(string $amount): int
+    {
+        $parts = explode('.', $amount, 2);
+
+        $whole = (int) $parts[0];
+
+        $fraction = str_pad(
+            $parts[1] ?? '',
+            2,
+            '0',
+            STR_PAD_RIGHT
+        );
+
+        return ($whole * 100) + (int) $fraction;
+    }
+
     private function validatePricing(
         string $price,
         string $purchaseCost
@@ -133,27 +183,48 @@ class ProductController extends Controller
         if ($priceCents < $costCents) {
             throw ValidationException::withMessages([
                 'price' =>
-                    'Selling price cannot be lower than the purchase cost of ₱' .
+                    'Selling price cannot be lower than the latest supplier purchase cost of ₱' .
                     number_format($costCents / 100, 2) .
                     '.',
             ]);
         }
     }
 
-    private function toCents(string $amount): int
+    private function latestReceiptCost(int $productId): ?string
     {
-        $parts = explode('.', $amount, 2);
+        $cost = StockInReceipt::query()
+            ->join(
+                'stock_movements',
+                'stock_movements.id',
+                '=',
+                'stock_in_receipts.stock_movement_id'
+            )
+            ->where(
+                'stock_movements.product_id',
+                $productId
+            )
+            ->whereNotNull(
+                'stock_in_receipts.unit_cost'
+            )
+            ->orderByDesc(
+                'stock_in_receipts.received_at'
+            )
+            ->orderByDesc(
+                'stock_in_receipts.id'
+            )
+            ->value('stock_in_receipts.unit_cost');
 
-        $whole = (int) $parts[0];
-        $fraction = str_pad($parts[1] ?? '', 2, '0');
-
-        return ($whole * 100) + (int) $fraction;
+        return $cost === null
+            ? null
+            : (string) $cost;
     }
 
     public function store(Request $request): RedirectResponse
     {
         $request->merge([
-            'name' => trim((string) $request->input('name', '')),
+            'name' => trim(
+                (string) $request->input('name', '')
+            ),
             'description' => trim(
                 (string) $request->input('description', '')
             ) ?: null,
@@ -177,13 +248,6 @@ class ProductController extends Controller
                 'string',
                 'max:5000',
             ],
-            'purchase_cost' => [
-                'required',
-                'numeric',
-                'gt:0',
-                'max:99999999.99',
-                'decimal:0,2',
-            ],
             'price' => [
                 'required',
                 'numeric',
@@ -208,30 +272,35 @@ class ProductController extends Controller
                 'boolean',
             ],
         ], [
-            'name.required' => 'Product name is required.',
-            'name.min' => 'Product name must have at least 3 characters.',
-            'category_id.required' => 'Please select a product category.',
-            'category_id.exists' => 'Please select an active category.',
-            'purchase_cost.required' => 'Supplier purchase cost is required.',
-            'purchase_cost.numeric' => 'Enter a valid purchase cost.',
-            'purchase_cost.gt' => 'Purchase cost must be greater than zero.',
-            'purchase_cost.decimal' => 'Purchase cost can have up to 2 decimal places.',
-            'price.required' => 'Product price is required.',
-            'price.numeric' => 'Enter a valid product price.',
-            'price.decimal' => 'Price can have up to 2 decimal places.',
-            'unit_of_measure.required' => 'Please select a unit of measurement.',
-            'unit_of_measure.in' => 'The selected unit of measurement is invalid.',
-            'reorder_level.required' => 'Reorder level is required.',
-            'reorder_level.numeric' => 'Reorder level must be a valid number.',
-            'reorder_level.min' => 'Reorder level cannot be negative.',
-            'reorder_level.decimal' => 'Reorder level can have up to 3 decimal places.',
-            'is_active.required' => 'Please select a product status.',
+            'name.required' =>
+                'Product name is required.',
+            'name.min' =>
+                'Product name must have at least 3 characters.',
+            'category_id.required' =>
+                'Please select a product category.',
+            'category_id.exists' =>
+                'Please select an active category.',
+            'price.required' =>
+                'Product price is required.',
+            'price.numeric' =>
+                'Enter a valid product price.',
+            'price.decimal' =>
+                'Price can have up to 2 decimal places.',
+            'unit_of_measure.required' =>
+                'Please select a unit of measurement.',
+            'unit_of_measure.in' =>
+                'The selected unit of measurement is invalid.',
+            'reorder_level.required' =>
+                'Reorder level is required.',
+            'reorder_level.numeric' =>
+                'Reorder level must be a valid number.',
+            'reorder_level.min' =>
+                'Reorder level cannot be negative.',
+            'reorder_level.decimal' =>
+                'Reorder level can have up to 3 decimal places.',
+            'is_active.required' =>
+                'Please select a product status.',
         ]);
-
-        $this->validatePricing(
-            (string) $validated['price'],
-            (string) $validated['purchase_cost']
-        );
 
         DB::transaction(function () use ($validated) {
             $category = Category::query()
@@ -242,29 +311,50 @@ class ProductController extends Controller
 
             if (!$category) {
                 throw ValidationException::withMessages([
-                    'category_id' => 'Please select an active category.',
+                    'category_id' =>
+                        'Please select an active category.',
                 ]);
             }
 
             $product = new Product();
 
-            $product->sku = $this->generateNextSku($category);
-            $product->name = $validated['name'];
-            $product->category_id = $category->id;
-            $product->description = $validated['description'] ?? null;
-            $product->purchase_cost = $validated['purchase_cost'];
-            $product->price = $validated['price'];
-            $product->unit_of_measure = $validated['unit_of_measure'];
-            $product->reorder_level = $validated['reorder_level'];
+            $product->sku =
+                $this->generateNextSku($category);
+
+            $product->name =
+                $validated['name'];
+
+            $product->category_id =
+                $category->id;
+
+            $product->description =
+                $validated['description'] ?? null;
+
+            $product->purchase_cost = null;
+
+            $product->price =
+                $validated['price'];
+
+            $product->unit_of_measure =
+                $validated['unit_of_measure'];
+
+            $product->reorder_level =
+                $validated['reorder_level'];
+
             $product->quantity = 0;
-            $product->is_active = $validated['is_active'];
+
+            $product->is_active =
+                $validated['is_active'];
 
             $product->save();
         }, 3);
 
         return redirect()
             ->route('inventory.products.index')
-            ->with('success', 'Product added successfully.');
+            ->with(
+                'success',
+                'Product added successfully.'
+            );
     }
 
     public function update(
@@ -272,7 +362,9 @@ class ProductController extends Controller
         Product $product
     ): RedirectResponse {
         $request->merge([
-            'name' => trim((string) $request->input('name', '')),
+            'name' => trim(
+                (string) $request->input('name', '')
+            ),
             'description' => trim(
                 (string) $request->input('description', '')
             ) ?: null,
@@ -295,14 +387,6 @@ class ProductController extends Controller
                 'string',
                 'max:5000',
             ],
-            'purchase_cost' => [
-                'sometimes',
-                'nullable',
-                'numeric',
-                'gt:0',
-                'max:99999999.99',
-                'decimal:0,2',
-            ],
             'price' => [
                 'required',
                 'numeric',
@@ -327,21 +411,30 @@ class ProductController extends Controller
                 'boolean',
             ],
         ], [
-            'name.required' => 'Product name is required.',
-            'name.min' => 'Product name must have at least 3 characters.',
-            'category_id.integer' => 'Please select a valid category.',
-            'purchase_cost.numeric' => 'Enter a valid purchase cost.',
-            'purchase_cost.gt' => 'Purchase cost must be greater than zero.',
-            'purchase_cost.decimal' => 'Purchase cost can have up to 2 decimal places.',
-            'price.required' => 'Product price is required.',
-            'price.numeric' => 'Enter a valid product price.',
-            'price.decimal' => 'Price can have up to 2 decimal places.',
-            'unit_of_measure.required' => 'Please select a unit of measurement.',
-            'unit_of_measure.in' => 'The selected unit of measurement is invalid.',
-            'reorder_level.required' => 'Reorder level is required.',
-            'reorder_level.numeric' => 'Reorder level must be a valid number.',
-            'reorder_level.min' => 'Reorder level cannot be negative.',
-            'reorder_level.decimal' => 'Reorder level can have up to 3 decimal places.',
+            'name.required' =>
+                'Product name is required.',
+            'name.min' =>
+                'Product name must have at least 3 characters.',
+            'category_id.integer' =>
+                'Please select a valid category.',
+            'price.required' =>
+                'Product price is required.',
+            'price.numeric' =>
+                'Enter a valid product price.',
+            'price.decimal' =>
+                'Price can have up to 2 decimal places.',
+            'unit_of_measure.required' =>
+                'Please select a unit of measurement.',
+            'unit_of_measure.in' =>
+                'The selected unit of measurement is invalid.',
+            'reorder_level.required' =>
+                'Reorder level is required.',
+            'reorder_level.numeric' =>
+                'Reorder level must be a valid number.',
+            'reorder_level.min' =>
+                'Reorder level cannot be negative.',
+            'reorder_level.decimal' =>
+                'Reorder level can have up to 3 decimal places.',
         ]);
 
         DB::transaction(function () use ($validated, $product) {
@@ -351,7 +444,8 @@ class ProductController extends Controller
                 ->firstOrFail();
 
             if (array_key_exists('category_id', $validated)) {
-                $newCategoryId = $validated['category_id'];
+                $newCategoryId =
+                    $validated['category_id'];
 
                 if ($newCategoryId !== null) {
                     $isCurrentCategory =
@@ -366,7 +460,8 @@ class ProductController extends Controller
 
                         if (!$activeCategoryExists) {
                             throw ValidationException::withMessages([
-                                'category_id' => 'Please select an active category.',
+                                'category_id' =>
+                                    'Please select an active category.',
                             ]);
                         }
                     } else {
@@ -376,7 +471,8 @@ class ProductController extends Controller
 
                         if (!$categoryExists) {
                             throw ValidationException::withMessages([
-                                'category_id' => 'The selected category no longer exists.',
+                                'category_id' =>
+                                    'The selected category no longer exists.',
                             ]);
                         }
                     }
@@ -388,8 +484,13 @@ class ProductController extends Controller
                 $lockedProduct->unit_of_measure;
 
             if ($unitChanged) {
-                $hasExistingStock = (float) $lockedProduct->quantity > 0;
-                $hasStockHistory = $lockedProduct->stockMovements()->exists();
+                $hasExistingStock =
+                    (float) $lockedProduct->quantity > 0;
+
+                $hasStockHistory =
+                    $lockedProduct
+                        ->stockMovements()
+                        ->exists();
 
                 if ($hasExistingStock || $hasStockHistory) {
                     throw ValidationException::withMessages([
@@ -399,71 +500,37 @@ class ProductController extends Controller
                 }
             }
 
-            $purchaseCost = array_key_exists(
-                'purchase_cost',
-                $validated
-            ) && $validated['purchase_cost'] !== null
-                ? (string) $validated['purchase_cost']
-                : (
-                    $lockedProduct->purchase_cost !== null
-                        ? (string) $lockedProduct->purchase_cost
-                        : null
-                );
-
-            $latestReceiptCost = StockInReceipt::query()
-                ->join(
-                    'stock_movements',
-                    'stock_movements.id',
-                    '=',
-                    'stock_in_receipts.stock_movement_id'
-                )
-                ->where('stock_movements.product_id', $lockedProduct->id)
-                ->whereNotNull('stock_in_receipts.unit_cost')
-                ->orderByDesc('stock_in_receipts.received_at')
-                ->orderByDesc('stock_in_receipts.id')
-                ->value('stock_in_receipts.unit_cost');
-
-            $requiredMinimum = $purchaseCost;
+            $latestReceiptCost = $this->latestReceiptCost(
+                $lockedProduct->id
+            );
 
             if ($latestReceiptCost !== null) {
-                if (
-                    $requiredMinimum === null ||
-                    $this->toCents((string) $latestReceiptCost) >
-                    $this->toCents($requiredMinimum)
-                ) {
-                    $requiredMinimum = (string) $latestReceiptCost;
-                }
-            }
-
-            if ($requiredMinimum !== null) {
                 $this->validatePricing(
                     (string) $validated['price'],
-                    $requiredMinimum
+                    $latestReceiptCost
                 );
             }
 
-            $lockedProduct->name = $validated['name'];
+            $lockedProduct->name =
+                $validated['name'];
 
             if (array_key_exists('category_id', $validated)) {
-                $lockedProduct->category_id = $validated['category_id'];
+                $lockedProduct->category_id =
+                    $validated['category_id'];
             }
 
             $lockedProduct->description =
                 $validated['description'] ?? null;
 
-            if (
-                array_key_exists('purchase_cost', $validated) &&
-                $validated['purchase_cost'] !== null
-            ) {
-                $lockedProduct->purchase_cost =
-                    $validated['purchase_cost'];
-            }
+            $lockedProduct->price =
+                $validated['price'];
 
-            $lockedProduct->price = $validated['price'];
             $lockedProduct->unit_of_measure =
                 $validated['unit_of_measure'];
+
             $lockedProduct->reorder_level =
                 $validated['reorder_level'];
+
             $lockedProduct->is_active =
                 $validated['is_active'];
 
@@ -472,14 +539,18 @@ class ProductController extends Controller
 
         return redirect()
             ->route('inventory.products.index')
-            ->with('success', 'Product updated successfully.');
+            ->with(
+                'success',
+                'Product updated successfully.'
+            );
     }
 
     public function archive(Product $product): RedirectResponse
     {
         if ($product->archived_at !== null) {
             return back()->withErrors([
-                'archive' => 'This product is already archived.',
+                'archive' =>
+                    'This product is already archived.',
             ]);
         }
 
@@ -490,14 +561,18 @@ class ProductController extends Controller
 
         return redirect()
             ->route('inventory.products.index')
-            ->with('success', 'Product archived successfully.');
+            ->with(
+                'success',
+                'Product archived successfully.'
+            );
     }
 
     public function restore(Product $product): RedirectResponse
     {
         if ($product->archived_at === null) {
             return back()->withErrors([
-                'restore' => 'This product is not archived.',
+                'restore' =>
+                    'This product is not archived.',
             ]);
         }
 
@@ -511,6 +586,9 @@ class ProductController extends Controller
                 'inventory.products.index',
                 ['status' => 'archived']
             )
-            ->with('success', 'Product restored successfully.');
+            ->with(
+                'success',
+                'Product restored successfully.'
+            );
     }
 }

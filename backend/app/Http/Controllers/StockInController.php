@@ -115,6 +115,18 @@ class StockInController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'reference_number' => trim(
+                (string) $request->input(
+                    'reference_number',
+                    ''
+                )
+            ),
+            'notes' => trim(
+                (string) $request->input('notes', '')
+            ) ?: null,
+        ]);
+
         $validated = $request->validate([
             'product_id' => [
                 'required',
@@ -200,12 +212,12 @@ class StockInController extends Controller
             if ($unitCostCents > $sellingPriceCents) {
                 throw ValidationException::withMessages([
                     'unit_cost' =>
-                        'Unit cost cannot exceed the product selling price of ₱' .
+                        'Supplier unit cost cannot exceed the product selling price of ₱' .
                         number_format(
                             $sellingPriceCents / 100,
                             2
                         ) .
-                        '.',
+                        '. Please update the product selling price first.',
                 ]);
             }
 
@@ -261,6 +273,13 @@ class StockInController extends Controller
                 1000
             );
 
+            if ($totalCostCents > 999999999999999999) {
+                throw ValidationException::withMessages([
+                    'quantity' =>
+                        'The total stock cost exceeds the maximum supported amount.',
+                ]);
+            }
+
             $totalCost = number_format(
                 $totalCostCents / 100,
                 2,
@@ -274,56 +293,63 @@ class StockInController extends Controller
             $movement->user_id = auth()->id();
             $movement->type = 'in';
 
-            $movement->quantity_change = $this->formatQuantity(
-                $quantityChange
-            );
+            $movement->quantity_change =
+                $this->formatQuantity($quantityChange);
 
-            $movement->quantity_before = $this->formatQuantity(
-                $quantityBefore
-            );
+            $movement->quantity_before =
+                $this->formatQuantity($quantityBefore);
 
-            $movement->quantity_after = $this->formatQuantity(
-                $quantityAfter
-            );
+            $movement->quantity_after =
+                $this->formatQuantity($quantityAfter);
 
             $movement->reason =
                 $validated['notes'] ?? null;
 
             $movement->save();
 
-            $receipt = new StockInReceipt();
-
-            $receipt->stock_movement_id = $movement->id;
-
-            $receipt->supplier_id =
-                $validated['supplier_id'] ?? null;
-
-           $referenceNumber = trim(
-                (string) ($validated['reference_number'] ?? '')
+            $referenceNumber = trim(
+                (string) (
+                    $validated['reference_number'] ?? ''
+                )
             );
 
             if ($referenceNumber === '') {
-                $referenceNumber = 'SI-' .
+                $referenceNumber =
+                    'SI-' .
                     now()->format('YmdHis') .
                     '-' .
                     $movement->id;
             }
 
-            $receipt->reference_number = $referenceNumber;
+            $receipt = new StockInReceipt();
+
+            $receipt->stock_movement_id =
+                $movement->id;
+
+            $receipt->supplier_id =
+                $validated['supplier_id'] ?? null;
+
+            $receipt->reference_number =
+                $referenceNumber;
 
             $receipt->received_at =
                 $validated['received_at'];
 
             $receipt->unit_cost =
-                $validated['unit_cost'];
+                number_format(
+                    $unitCostCents / 100,
+                    2,
+                    '.',
+                    ''
+                );
 
-            $receipt->total_cost = $totalCost;
+            $receipt->total_cost =
+                $totalCost;
 
             $receipt->save();
 
-            $product->quantity = $this->formatQuantity(
-                $quantityAfter
-            );
+            $product->quantity =
+                $this->formatQuantity($quantityAfter);
 
             $product->save();
         }, 3);

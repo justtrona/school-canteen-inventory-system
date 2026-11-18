@@ -5,25 +5,7 @@ import ViewModal from "../../../../components/modals/ViewModal.jsx";
 
 const COUNT_UNITS = ["pcs", "bottle", "pack", "box"];
 
-// ========================================
-// FORMAT QUANTITY
-// ========================================
-
 const formatQuantity = (value, unit) => {
-    const number = Number(value ?? 0);
-
-    if (!Number.isFinite(number)) return "—";
-
-    return number.toLocaleString("en-PH", {
-        maximumFractionDigits: COUNT_UNITS.includes(unit) ? 0 : 3,
-    });
-};
-
-// ========================================
-// FORMAT CURRENCY
-// ========================================
-
-const formatCurrency = (value) => {
     if (value === null || value === undefined || value === "") {
         return "—";
     }
@@ -33,16 +15,30 @@ const formatCurrency = (value) => {
     if (!Number.isFinite(number)) return "—";
 
     return number.toLocaleString("en-PH", {
+        maximumFractionDigits: COUNT_UNITS.includes(unit)
+            ? 0
+            : 3,
+    });
+};
+
+const formatCurrency = (value) => {
+    if (value === null || value === undefined || value === "") {
+        return "Not recorded";
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "Not recorded";
+    }
+
+    return number.toLocaleString("en-PH", {
         style: "currency",
         currency: "PHP",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
 };
-
-// ========================================
-// FORMAT DATE
-// ========================================
 
 const formatDate = (value) => {
     if (!value) return "—";
@@ -53,18 +49,17 @@ const formatDate = (value) => {
             : value
     );
 
-    if (Number.isNaN(date.getTime())) return "—";
+    if (Number.isNaN(date.getTime())) {
+        return "—";
+    }
 
     return date.toLocaleDateString("en-PH", {
         year: "numeric",
         month: "long",
         day: "numeric",
+        timeZone: "Asia/Manila",
     });
 };
-
-// ========================================
-// VIEW STOCK IN MODAL
-// ========================================
 
 export default function ViewStockInModal({
     isOpen,
@@ -73,11 +68,11 @@ export default function ViewStockInModal({
 }) {
     const receipt = movement?.stock_in_receipt;
 
-    const unit = movement?.product?.unit_of_measure ?? "pcs";
+    const unit =
+        movement?.product?.unit_of_measure ?? "pcs";
 
-    // ========================================
-    // RECEIVING INFORMATION
-    // ========================================
+    const supplierName =
+        receipt?.supplier?.name ?? "No supplier recorded";
 
     const receivingFields = [
         [
@@ -87,7 +82,8 @@ export default function ViewStockInModal({
         [
             "Date Received",
             formatDate(
-                receipt?.received_at ?? movement?.created_at
+                receipt?.received_at ??
+                    movement?.created_at
             ),
         ],
         [
@@ -100,7 +96,7 @@ export default function ViewStockInModal({
         ],
         [
             "Supplier",
-            receipt?.supplier?.name ?? "—",
+            supplierName,
         ],
         [
             "Quantity Received",
@@ -135,13 +131,9 @@ export default function ViewStockInModal({
         ],
     ];
 
-    // ========================================
-    // PURCHASE COST INFORMATION
-    // ========================================
-
     const purchaseCostFields = [
         [
-            "Unit Cost",
+            "Supplier Unit Cost",
             formatCurrency(receipt?.unit_cost),
         ],
         [
@@ -149,10 +141,6 @@ export default function ViewStockInModal({
             formatCurrency(receipt?.total_cost),
         ],
     ];
-
-    // ========================================
-    // RENDER
-    // ========================================
 
     return (
         <ViewModal
@@ -165,32 +153,30 @@ export default function ViewStockInModal({
         >
             {movement && (
                 <>
-                    {/* RECEIVING INFORMATION */}
-
                     <div className="sc-view-section">
                         <h3 className="sc-view-section-title">
                             Receiving Information
                         </h3>
 
                         <div className="sc-view-grid">
-                            {receivingFields.map(([label, value]) => (
-                                <div
-                                    className="sc-view-item"
-                                    key={label}
-                                >
-                                    <span className="sc-view-label">
-                                        {label}
-                                    </span>
+                            {receivingFields.map(
+                                ([label, value]) => (
+                                    <div
+                                        className="sc-view-item"
+                                        key={label}
+                                    >
+                                        <span className="sc-view-label">
+                                            {label}
+                                        </span>
 
-                                    <span className="sc-view-value">
-                                        {value}
-                                    </span>
-                                </div>
-                            ))}
+                                        <span className="sc-view-value">
+                                            {value}
+                                        </span>
+                                    </div>
+                                )
+                            )}
                         </div>
                     </div>
-
-                    {/* PURCHASE COST */}
 
                     <div className="sc-view-section">
                         <h3 className="sc-view-section-title">
@@ -198,24 +184,24 @@ export default function ViewStockInModal({
                         </h3>
 
                         <div className="sc-view-grid">
-                            {purchaseCostFields.map(([label, value]) => (
-                                <div
-                                    className="sc-view-item"
-                                    key={label}
-                                >
-                                    <span className="sc-view-label">
-                                        {label}
-                                    </span>
+                            {purchaseCostFields.map(
+                                ([label, value]) => (
+                                    <div
+                                        className="sc-view-item"
+                                        key={label}
+                                    >
+                                        <span className="sc-view-label">
+                                            {label}
+                                        </span>
 
-                                    <span className="sc-view-value">
-                                        {value}
-                                    </span>
-                                </div>
-                            ))}
+                                        <span className="sc-view-value">
+                                            {value}
+                                        </span>
+                                    </div>
+                                )
+                            )}
                         </div>
                     </div>
-
-                    {/* REMARKS */}
 
                     <div className="sc-view-section">
                         <h3 className="sc-view-section-title">

@@ -16,15 +16,7 @@ const UNIT_OPTIONS = [
     { value: "mL", label: "Milliliters (mL)" },
 ];
 
-const formatCurrency = (value) =>
-    new Intl.NumberFormat("en-PH", {
-        style: "currency",
-        currency: "PHP",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(Number(value) || 0);
-
-const isValidMoney = (value, allowZero = false) => {
+const isValidMoney = (value) => {
     const text = String(value);
 
     if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
@@ -35,8 +27,8 @@ const isValidMoney = (value, allowZero = false) => {
 
     return (
         Number.isFinite(amount) &&
-        amount <= 99999999.99 &&
-        (allowZero ? amount >= 0 : amount > 0)
+        amount >= 0 &&
+        amount <= 99999999.99
     );
 };
 
@@ -45,7 +37,9 @@ export default function AddProductModal({
     onClose,
     categories = [],
 }) {
-    const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+    const [isSuccessModalOpen, setIsSuccessModalOpen] =
+        useState(false);
+
     const [displayedSku, setDisplayedSku] = useState("");
     const [isLoadingSku, setIsLoadingSku] = useState(false);
     const [skuError, setSkuError] = useState("");
@@ -63,24 +57,13 @@ export default function AddProductModal({
         name: "",
         category_id: "",
         description: "",
-        purchase_cost: "",
         price: "",
         unit_of_measure: "pcs",
         reorder_level: "0",
         is_active: true,
     });
 
-    const purchaseCostValid = isValidMoney(data.purchase_cost);
-    const sellingPriceValid = isValidMoney(data.price, true);
-
-    const sellingPriceBelowCost =
-        purchaseCostValid &&
-        sellingPriceValid &&
-        Number(data.price) < Number(data.purchase_cost);
-
-    const pricingError = sellingPriceBelowCost
-        ? `Selling price cannot be lower than the supplier purchase cost. Minimum selling price: ${formatCurrency(data.purchase_cost)}.`
-        : "";
+    const sellingPriceValid = isValidMoney(data.price);
 
     const getError = (field) =>
         localErrors[field] || errors[field] || "";
@@ -156,8 +139,10 @@ export default function AddProductModal({
                 if (!controller.signal.aborted) {
                     setDisplayedSku("");
                     setSkuError(error.message);
-
-                    console.error("SKU preview error:", error);
+                    console.error(
+                        "SKU preview error:",
+                        error
+                    );
                 }
             } finally {
                 if (!controller.signal.aborted) {
@@ -215,16 +200,9 @@ export default function AddProductModal({
                 "Please select a product category.";
         }
 
-        if (!purchaseCostValid) {
-            nextErrors.purchase_cost =
-                "Enter a valid purchase cost greater than zero with up to 2 decimal places.";
-        }
-
         if (!sellingPriceValid) {
             nextErrors.price =
                 "Enter a valid selling price with up to 2 decimal places.";
-        } else if (sellingPriceBelowCost) {
-            nextErrors.price = pricingError;
         }
 
         if (!data.unit_of_measure) {
@@ -291,6 +269,7 @@ export default function AddProductModal({
                         <h3 className="sc-form-section-title">
                             Product Information
                         </h3>
+
                         <p className="sc-form-section-description">
                             Basic details used to identify this product.
                         </p>
@@ -463,6 +442,7 @@ export default function AddProductModal({
                         <h3 className="sc-form-section-title">
                             Inventory Measurement
                         </h3>
+
                         <p className="sc-form-section-description">
                             Define how this product will be measured
                             and monitored in your inventory.
@@ -550,8 +530,8 @@ export default function AddProductModal({
                             />
 
                             <p className="sc-form-help">
-                                Minimum stock quantity before
-                                the product needs replenishment.
+                                Minimum stock quantity before the
+                                product needs replenishment.
                             </p>
 
                             {getError("reorder_level") && (
@@ -576,10 +556,11 @@ export default function AddProductModal({
                             </p>
 
                             <p className="sc-form-notice-description">
-                                Use one consistent unit for each product.
-                                For example, use kg for flour or pcs for
-                                individually sold snacks. Weight-based
-                                products support decimal quantities.
+                                Use one consistent unit for each
+                                product. For example, use kg for flour
+                                or pcs for individually sold snacks.
+                                Weight-based products support decimal
+                                quantities.
                             </p>
                         </div>
                     </div>
@@ -590,9 +571,11 @@ export default function AddProductModal({
                         <h3 className="sc-form-section-title">
                             Pricing
                         </h3>
+
                         <p className="sc-form-section-description">
-                            Selling price must be equal to or higher
-                            than the supplier purchase cost.
+                            Set the product selling price. Supplier
+                            purchase cost will be recorded
+                            automatically from Stock In.
                         </p>
                     </div>
 
@@ -602,9 +585,6 @@ export default function AddProductModal({
                             className="sc-form-label"
                         >
                             Supplier Purchase Cost
-                            <span className="sc-form-required">
-                                *
-                            </span>
                         </label>
 
                         <div className="sc-form-price">
@@ -614,37 +594,26 @@ export default function AddProductModal({
 
                             <input
                                 id="product-purchase-cost"
-                                type="number"
+                                type="text"
                                 className="sc-form-price-input"
-                                placeholder="0.00"
-                                min="0.01"
-                                max="99999999.99"
-                                step="0.01"
-                                value={data.purchase_cost}
-                                onChange={(event) =>
-                                    updateField(
-                                        "purchase_cost",
-                                        event.target.value
-                                    )
-                                }
-                                aria-invalid={Boolean(
-                                    getError("purchase_cost")
-                                )}
-                                required
+                                value="Not yet recorded"
+                                readOnly
+                                aria-readonly="true"
+                                title="Purchase cost is recorded through Stock In."
+                                style={{
+                                    cursor: "not-allowed",
+                                    color: "#64748b",
+                                    backgroundColor: "#f8fafc",
+                                }}
                             />
                         </div>
 
                         <p className="sc-form-help">
-                            Initial cost per unit from the supplier.
-                            Actual delivery costs are recorded during
-                            Stock In.
+                            This value is automatically determined
+                            from supplier delivery costs recorded
+                            during Stock In. It cannot be edited
+                            when adding a product.
                         </p>
-
-                        {getError("purchase_cost") && (
-                            <p className="sc-form-error">
-                                {getError("purchase_cost")}
-                            </p>
-                        )}
                     </div>
 
                     <div className="sc-form-group">
@@ -679,52 +648,27 @@ export default function AddProductModal({
                                     )
                                 }
                                 aria-invalid={Boolean(
-                                    getError("price") ||
-                                    sellingPriceBelowCost
+                                    getError("price")
                                 )}
-                                aria-describedby={
-                                    sellingPriceBelowCost
-                                        ? "product-pricing-warning"
-                                        : undefined
-                                }
                                 required
                             />
                         </div>
 
-                        {sellingPriceBelowCost && (
+                        <p className="sc-form-help">
+                            Enter the selling price for this product.
+                            Once a supplier cost is recorded,
+                            selling-price validation will use
+                            the recorded purchase cost.
+                        </p>
+
+                        {getError("price") && (
                             <p
-                                id="product-pricing-warning"
                                 className="sc-form-error"
                                 role="alert"
-                                style={{
-                                    color: "#dc2626",
-                                    fontWeight: 600,
-                                }}
                             >
-                                {pricingError}
+                                {getError("price")}
                             </p>
                         )}
-
-                        {!sellingPriceBelowCost &&
-                            purchaseCostValid &&
-                            sellingPriceValid && (
-                                <p className="sc-form-help">
-                                    Gross profit per unit:{" "}
-                                    <strong>
-                                        {formatCurrency(
-                                            Number(data.price) -
-                                            Number(data.purchase_cost)
-                                        )}
-                                    </strong>
-                                </p>
-                            )}
-
-                        {getError("price") &&
-                            getError("price") !== pricingError && (
-                                <p className="sc-form-error">
-                                    {getError("price")}
-                                </p>
-                            )}
                     </div>
                 </div>
 
@@ -733,6 +677,7 @@ export default function AddProductModal({
                         <h3 className="sc-form-section-title">
                             Availability
                         </h3>
+
                         <p className="sc-form-section-description">
                             Control whether this product is available
                             for sale.
@@ -799,8 +744,9 @@ export default function AddProductModal({
 
                         <p className="sc-form-notice-description">
                             New products always start with zero stock.
-                            Record received quantities separately through
-                            the Stock In process.
+                            Record received quantities and supplier
+                            purchase costs separately through the
+                            Stock In process.
                         </p>
                     </div>
                 </div>
@@ -812,7 +758,7 @@ export default function AddProductModal({
                     setIsSuccessModalOpen(false)
                 }
                 title="Product Added Successfully!"
-                message="The product has been saved to your inventory and is ready for stock management."
+                message="The product has been saved to your inventory. Supplier purchase cost will be available after Stock In."
                 buttonLabel="Done"
             />
         </>

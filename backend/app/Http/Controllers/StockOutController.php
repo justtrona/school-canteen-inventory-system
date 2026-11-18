@@ -32,9 +32,14 @@ class StockOutController extends Controller
         'other',
     ];
 
-    // ========================================
-    // STOCK OUT LIST
-    // ========================================
+    private const REASON_LABELS = [
+        'damaged' => 'Damaged',
+        'expired' => 'Expired',
+        'spoiled' => 'Spoiled',
+        'internal_use' => 'Internal Use',
+        'inventory_correction' => 'Inventory Correction',
+        'other' => 'Other',
+    ];
 
     public function index(Request $request): Response
     {
@@ -50,11 +55,13 @@ class StockOutController extends Controller
             ])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
-                    $query->whereHas('product', function ($productQuery) use ($search) {
-                        $productQuery
-                            ->where('name', 'like', "%{$search}%")
-                            ->orWhere('sku', 'like', "%{$search}%");
-                    })->orWhere('reason', 'like', "%{$search}%");
+                    $query
+                        ->whereHas('product', function ($productQuery) use ($search) {
+                            $productQuery
+                                ->where('name', 'like', "%{$search}%")
+                                ->orWhere('sku', 'like', "%{$search}%");
+                        })
+                        ->orWhere('reason', 'like', "%{$search}%");
                 });
             })
             ->orderByDesc('id')
@@ -82,10 +89,6 @@ class StockOutController extends Controller
             'reasons' => self::REASONS,
         ]);
     }
-
-    // ========================================
-    // DECIMAL HELPERS
-    // ========================================
 
     private function toMilli(string $value): int
     {
@@ -115,10 +118,6 @@ class StockOutController extends Controller
             STR_PAD_LEFT
         );
     }
-
-    // ========================================
-    // STORE STOCK OUT
-    // ========================================
 
     public function store(Request $request): RedirectResponse
     {
@@ -185,31 +184,24 @@ class StockOutController extends Controller
             ]);
         }
 
-        $releasedMilli = $this->toMilli($quantityText);
+        $releasedMilli = $this->toMilli(
+            $quantityText
+        );
 
-        if ($releasedMilli <= 0) {
+        if (
+            $releasedMilli <= 0 ||
+            $releasedMilli > self::MAX_QUANTITY_MILLI
+        ) {
             throw ValidationException::withMessages([
                 'quantity' =>
-                    'Released quantity must be greater than zero.',
+                    'Released quantity must be greater than zero and within the allowed limit.',
             ]);
         }
 
-        $reasonLabels = [
-            'damaged' => 'Damaged',
-            'expired' => 'Expired',
-            'spoiled' => 'Spoiled',
-            'internal_use' => 'Internal Use',
-            'inventory_correction' => 'Inventory Correction',
-            'other' => 'Other',
-        ];
-
         DB::transaction(function () use (
             $validated,
-            $releasedMilli,
-            $reasonLabels
+            $releasedMilli
         ) {
-            // Lock product to prevent simultaneous deductions.
-
             $product = Product::query()
                 ->whereKey($validated['product_id'])
                 ->lockForUpdate()
@@ -224,8 +216,6 @@ class StockOutController extends Controller
                         'Please select an active, non-archived product.',
                 ]);
             }
-
-            // Count-based products require whole quantities.
 
             if (
                 in_array(
@@ -245,8 +235,6 @@ class StockOutController extends Controller
                 (string) $product->quantity
             );
 
-            // Prevent stock from becoming negative.
-
             if ($releasedMilli > $beforeMilli) {
                 throw ValidationException::withMessages([
                     'quantity' =>
@@ -258,27 +246,35 @@ class StockOutController extends Controller
                 ]);
             }
 
-            $afterMilli = $beforeMilli - $releasedMilli;
+            $afterMilli =
+                $beforeMilli - $releasedMilli;
 
-            $before = $this->fromMilli($beforeMilli);
-            $change = $this->fromMilli($releasedMilli);
-            $after = $this->fromMilli($afterMilli);
+            $before = $this->fromMilli(
+                $beforeMilli
+            );
 
-            // Combine reason and optional remarks.
+            $change = $this->fromMilli(
+                $releasedMilli
+            );
 
-            $reason = $reasonLabels[$validated['reason']];
+            $after = $this->fromMilli(
+                $afterMilli
+            );
 
-            if (!empty($validated['remarks'])) {
-                $reason .= ' - ' . trim($validated['remarks']);
+            $reason = self::REASON_LABELS[
+                $validated['reason']
+            ];
+
+            $remarks = trim(
+                (string) ($validated['remarks'] ?? '')
+            );
+
+            if ($remarks !== '') {
+                $reason .= ' - ' . $remarks;
             }
-
-            // Update current inventory.
 
             $product->quantity = $after;
             $product->save();
-
-            // Create permanent stock movement history.
-            // Negative quantity_change represents stock removal.
 
             StockMovement::create([
                 'product_id' => $product->id,

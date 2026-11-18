@@ -12,17 +12,46 @@ const REASON_OPTIONS = [
     { value: "expired", label: "Expired" },
     { value: "spoiled", label: "Spoiled" },
     { value: "internal_use", label: "Internal Use" },
-    { value: "inventory_correction", label: "Inventory Correction" },
+    {
+        value: "inventory_correction",
+        label: "Inventory Correction",
+    },
     { value: "other", label: "Other" },
 ];
 
+const MAX_QUANTITY_MILLI = 999999999999;
+
 // ========================================
-// FORMAT QUANTITY
+// QUANTITY HELPERS
 // ========================================
 
+const toMilli = (value) => {
+    const text = String(value ?? "").trim();
+
+    if (!/^(?:0|[1-9]\d{0,8})(?:\.\d{1,3})?$/.test(text)) {
+        return null;
+    }
+
+    const [whole, fraction = ""] = text.split(".");
+
+    return (
+        Number(whole) * 1000 +
+        Number(fraction.padEnd(3, "0"))
+    );
+};
+
 const formatQuantity = (value, unit) => {
-    return Number(value ?? 0).toLocaleString("en-PH", {
-        maximumFractionDigits: COUNT_UNITS.includes(unit) ? 0 : 3,
+    const number = Number(value ?? 0);
+
+    if (!Number.isFinite(number)) {
+        return "0";
+    }
+
+    return number.toLocaleString("en-PH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: COUNT_UNITS.includes(unit)
+            ? 0
+            : 3,
     });
 };
 
@@ -64,15 +93,31 @@ export default function AddStockOutModal({
 
     const unit = selectedProduct?.unit_of_measure ?? "";
 
-    const currentStock = Number(
-        selectedProduct?.quantity ?? 0
-    );
-
-    const availableStock = Number.isFinite(currentStock)
-        ? currentStock
-        : 0;
-
     const isCountUnit = COUNT_UNITS.includes(unit);
+
+    const availableMilli = selectedProduct
+        ? toMilli(String(selectedProduct.quantity ?? "0"))
+        : null;
+
+    const availableStock =
+        availableMilli !== null
+            ? availableMilli / 1000
+            : 0;
+
+    const releasedMilli = toMilli(data.quantity);
+
+    const remainingMilli =
+        availableMilli !== null &&
+        releasedMilli !== null &&
+        releasedMilli > 0 &&
+        releasedMilli <= availableMilli
+            ? availableMilli - releasedMilli
+            : null;
+
+    const canRelease =
+        Boolean(selectedProduct) &&
+        availableMilli !== null &&
+        availableMilli > 0;
 
     // ========================================
     // FIELD ERRORS
@@ -124,8 +169,11 @@ export default function AddStockOutModal({
     const validate = () => {
         const nextErrors = {};
 
-        const quantityText = data.quantity.trim();
-        const quantity = Number(quantityText);
+        const quantityText = String(
+            data.quantity ?? ""
+        ).trim();
+
+        const quantityMilli = toMilli(quantityText);
 
         if (!selectedProduct) {
             nextErrors.product_id =
@@ -136,22 +184,27 @@ export default function AddStockOutModal({
             nextErrors.quantity =
                 "Released quantity is required.";
         } else if (
-            !/^(?:0|[1-9]\d{0,8})(?:\.\d{1,3})?$/.test(
-                quantityText
-            ) ||
-            !Number.isFinite(quantity) ||
-            quantity <= 0
+            quantityMilli === null ||
+            quantityMilli <= 0 ||
+            quantityMilli > MAX_QUANTITY_MILLI
         ) {
             nextErrors.quantity =
                 "Enter a positive quantity with up to 3 decimal places.";
         } else if (
             isCountUnit &&
-            !Number.isInteger(quantity)
+            quantityMilli % 1000 !== 0
         ) {
             nextErrors.quantity =
                 `Quantity for ${unit} must be a whole number.`;
         } else if (
-            quantity > availableStock
+            selectedProduct &&
+            availableMilli === null
+        ) {
+            nextErrors.quantity =
+                "Unable to determine available stock. Please refresh the page.";
+        } else if (
+            selectedProduct &&
+            quantityMilli > availableMilli
         ) {
             nextErrors.quantity =
                 `Insufficient stock. Only ${formatQuantity(
@@ -172,7 +225,7 @@ export default function AddStockOutModal({
                 "Please select a valid stock-out reason.";
         }
 
-        if (data.remarks.length > 2000) {
+        if (String(data.remarks ?? "").length > 2000) {
             nextErrors.remarks =
                 "Remarks cannot exceed 2,000 characters.";
         }
@@ -189,7 +242,9 @@ export default function AddStockOutModal({
     const handleSubmit = (event) => {
         event?.preventDefault();
 
-        if (processing || !validate()) return;
+        if (processing || !validate()) {
+            return;
+        }
 
         post("/inventory/stock-out", {
             preserveScroll: true,
@@ -231,7 +286,8 @@ export default function AddStockOutModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Select the product being removed from inventory.
+                            Select the product being removed
+                            from inventory.
                         </p>
                     </div>
 
@@ -253,20 +309,30 @@ export default function AddStockOutModal({
                             className="sc-form-select"
                             value={data.product_id}
                             onChange={(event) => {
-                                updateField(
+                                const productId =
+                                    event.target.value;
+
+                                setData((previous) => ({
+                                    ...previous,
+                                    product_id: productId,
+                                    quantity: "",
+                                }));
+
+                                clearErrors(
                                     "product_id",
-                                    event.target.value
+                                    "quantity"
                                 );
 
-                                setData("quantity", "");
-
                                 setLocalErrors((previous) => {
-                                    const next = { ...previous };
+                                    const next = {
+                                        ...previous,
+                                    };
+
+                                    delete next.product_id;
                                     delete next.quantity;
+
                                     return next;
                                 });
-
-                                clearErrors("quantity");
                             }}
                             aria-invalid={Boolean(
                                 fieldError("product_id")
@@ -294,7 +360,7 @@ export default function AddStockOutModal({
                         )}
                     </div>
 
-                    {/* CURRENT STOCK */}
+                    {/* AVAILABLE STOCK */}
 
                     {selectedProduct && (
                         <div className="sc-form-notice">
@@ -321,9 +387,11 @@ export default function AddStockOutModal({
                         </div>
                     )}
 
-                    {selectedProduct && availableStock <= 0 && (
+                    {selectedProduct && !canRelease && (
                         <p className="sc-form-error">
-                            This product has no available stock to release.
+                            {availableMilli === null
+                                ? "Unable to read the available stock. Please refresh the page."
+                                : "This product has no available stock to release."}
                         </p>
                     )}
                 </div>
@@ -339,7 +407,8 @@ export default function AddStockOutModal({
                         </h3>
 
                         <p className="sc-form-section-description">
-                            Specify the quantity and reason for removing stock.
+                            Specify the quantity and reason
+                            for removing stock.
                         </p>
                     </div>
 
@@ -362,7 +431,11 @@ export default function AddStockOutModal({
                             type="number"
                             min={isCountUnit ? "1" : "0.001"}
                             max={availableStock}
-                            step={isCountUnit ? "1" : "0.001"}
+                            step={
+                                isCountUnit
+                                    ? "1"
+                                    : "0.001"
+                            }
                             placeholder={
                                 isCountUnit
                                     ? "e.g. 5"
@@ -375,10 +448,7 @@ export default function AddStockOutModal({
                                     event.target.value
                                 )
                             }
-                            disabled={
-                                !selectedProduct ||
-                                availableStock <= 0
-                            }
+                            disabled={!canRelease}
                             aria-invalid={Boolean(
                                 fieldError("quantity")
                             )}
@@ -399,6 +469,34 @@ export default function AddStockOutModal({
                             </p>
                         )}
                     </div>
+
+                    {/* REMAINING STOCK PREVIEW */}
+
+                    {selectedProduct &&
+                        remainingMilli !== null && (
+                            <div className="sc-form-notice">
+                                <div
+                                    className="sc-form-notice-icon"
+                                    aria-hidden="true"
+                                >
+                                    i
+                                </div>
+
+                                <div className="sc-form-notice-content">
+                                    <p className="sc-form-notice-title">
+                                        Remaining Stock After Release
+                                    </p>
+
+                                    <p className="sc-form-notice-description">
+                                        {formatQuantity(
+                                            remainingMilli / 1000,
+                                            unit
+                                        )}{" "}
+                                        {unit}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                     {/* REASON */}
 
@@ -506,12 +604,13 @@ export default function AddStockOutModal({
                         </p>
 
                         <p className="sc-form-notice-description">
-                            Releasing stock reduces the product's
-                            available inventory and creates a permanent
-                            stock movement record. This transaction is
-                            intended for non-sales deductions only.
-                            Customer purchases should be recorded
-                            through Point of Sale.
+                            Releasing stock reduces the
+                            product's available inventory and
+                            creates a permanent stock movement
+                            record. This transaction is
+                            intended for non-sales deductions
+                            only. Customer purchases should
+                            be recorded through Point of Sale.
                         </p>
                     </div>
                 </div>

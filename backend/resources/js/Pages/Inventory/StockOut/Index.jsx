@@ -22,7 +22,9 @@ const formatQuantity = (quantity, unit = "pcs") => {
     if (!Number.isFinite(number)) return "—";
 
     return number.toLocaleString("en-PH", {
-        maximumFractionDigits: COUNT_UNITS.includes(unit) ? 0 : 3,
+        maximumFractionDigits: COUNT_UNITS.includes(unit)
+            ? 0
+            : 3,
     });
 };
 
@@ -41,6 +43,7 @@ const formatDate = (value) => {
         year: "numeric",
         month: "short",
         day: "numeric",
+        timeZone: "Asia/Manila",
     });
 };
 
@@ -51,7 +54,7 @@ const formatDate = (value) => {
 const formatReason = (reason) => {
     if (!reason) return "—";
 
-    return reason.split(" - ")[0];
+    return String(reason).split(" - ")[0];
 };
 
 // ========================================
@@ -63,12 +66,17 @@ export default function Index({
     products = [],
     filters = {},
 }) {
-    const [search, setSearch] = useState(filters.search ?? "");
+    const [search, setSearch] = useState(
+        filters.search ?? ""
+    );
 
     const [addOpen, setAddOpen] = useState(false);
-    const [viewingMovement, setViewingMovement] = useState(null);
+
+    const [viewingMovement, setViewingMovement] =
+        useState(null);
 
     const [actionMenu, setActionMenu] = useState(null);
+
     const [isFiltering, setIsFiltering] = useState(false);
 
     const menuRef = useRef(null);
@@ -76,15 +84,12 @@ export default function Index({
     const timerRef = useRef(null);
     const requestRef = useRef(0);
 
-    const appliedRef = useRef({
-        search: filters.search ?? "",
-    });
+    const appliedRef = useRef(
+        filters.search ?? ""
+    );
 
-    const currentRef = useRef({
-        search,
-    });
-
-    currentRef.current = { search };
+    const searchRef = useRef(search);
+    searchRef.current = search;
 
     // ========================================
     // CLOSE ACTION MENU
@@ -121,7 +126,8 @@ export default function Index({
             )
         );
 
-        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceBelow =
+            window.innerHeight - rect.bottom;
 
         const top =
             spaceBelow >= menuHeight + padding
@@ -143,13 +149,11 @@ export default function Index({
         if (!actionMenu) return;
 
         const onPointerDown = (event) => {
-            const clickedMenu = menuRef.current?.contains(
-                event.target
-            );
+            const clickedMenu =
+                menuRef.current?.contains(event.target);
 
-            const clickedButton = buttonRef.current?.contains(
-                event.target
-            );
+            const clickedButton =
+                buttonRef.current?.contains(event.target);
 
             if (!clickedMenu && !clickedButton) {
                 closeActionMenu();
@@ -163,12 +167,30 @@ export default function Index({
             }
         };
 
-        const onScroll = () => closeActionMenu();
+        const onScroll = () => {
+            closeActionMenu();
+        };
 
-        document.addEventListener("pointerdown", onPointerDown);
-        document.addEventListener("keydown", onKeyDown);
-        window.addEventListener("scroll", onScroll, true);
-        window.addEventListener("resize", onScroll);
+        document.addEventListener(
+            "pointerdown",
+            onPointerDown
+        );
+
+        document.addEventListener(
+            "keydown",
+            onKeyDown
+        );
+
+        window.addEventListener(
+            "scroll",
+            onScroll,
+            true
+        );
+
+        window.addEventListener(
+            "resize",
+            onScroll
+        );
 
         return () => {
             document.removeEventListener(
@@ -176,10 +198,21 @@ export default function Index({
                 onPointerDown
             );
 
-            document.removeEventListener("keydown", onKeyDown);
+            document.removeEventListener(
+                "keydown",
+                onKeyDown
+            );
 
-            window.removeEventListener("scroll", onScroll, true);
-            window.removeEventListener("resize", onScroll);
+            window.removeEventListener(
+                "scroll",
+                onScroll,
+                true
+            );
+
+            window.removeEventListener(
+                "resize",
+                onScroll
+            );
         };
     }, [actionMenu]);
 
@@ -188,14 +221,17 @@ export default function Index({
     // ========================================
 
     useEffect(() => {
-        const next = {
-            search: filters.search ?? "",
-        };
+        const nextSearch = filters.search ?? "";
 
-        appliedRef.current = next;
+        appliedRef.current = nextSearch;
 
-        if (currentRef.current.search === next.search) {
-            setIsFiltering(false);
+        // Do not overwrite text the user is currently
+        // typing while a search request is pending.
+        if (
+            !isFiltering ||
+            searchRef.current.trim() === nextSearch
+        ) {
+            setSearch(nextSearch);
         }
     }, [filters.search]);
 
@@ -215,21 +251,26 @@ export default function Index({
     // REQUEST FILTERS
     // ========================================
 
-    const requestFilters = (nextFilters, delay = 0) => {
+    const requestFilters = (
+        nextFilters,
+        delay = 0
+    ) => {
         if (timerRef.current) {
             clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
 
         const requestId = ++requestRef.current;
 
         const normalized = {
-            search: nextFilters.search.trim(),
+            search: String(
+                nextFilters.search ?? ""
+            ).trim(),
         };
 
         if (
-            normalized.search === appliedRef.current.search
+            normalized.search === appliedRef.current
         ) {
-            router.cancelAll();
             setIsFiltering(false);
             return;
         }
@@ -247,8 +288,24 @@ export default function Index({
                     preserveScroll: true,
                     replace: true,
 
+                    onSuccess: (page) => {
+                        if (
+                            requestId !== requestRef.current
+                        ) {
+                            return;
+                        }
+
+                        const appliedSearch =
+                            page.props.filters?.search ??
+                            normalized.search;
+
+                        appliedRef.current = appliedSearch;
+                    },
+
                     onFinish: () => {
-                        if (requestId === requestRef.current) {
+                        if (
+                            requestId === requestRef.current
+                        ) {
                             setIsFiltering(false);
                         }
                     },
@@ -304,16 +361,18 @@ export default function Index({
             <Head title="Stock Out" />
 
             <div className="products-page">
-
-                {/* PAGE HEADER */}
+                {/* ========================================
+                    PAGE HEADER
+                ======================================== */}
 
                 <div className="products-page-header">
                     <div>
                         <h1>Stock Out</h1>
 
                         <p>
-                            Manage inventory deductions and record
-                            products removed from the school canteen.
+                            Manage inventory deductions and
+                            record products removed from the
+                            school canteen.
                         </p>
                     </div>
 
@@ -329,10 +388,11 @@ export default function Index({
                     </button>
                 </div>
 
-                {/* MAIN PANEL */}
+                {/* ========================================
+                    MAIN PANEL
+                ======================================== */}
 
                 <section className="products-panel">
-
                     {/* FILTERS */}
 
                     <div className="products-filters">
@@ -348,7 +408,12 @@ export default function Index({
                                 strokeLinejoin="round"
                                 aria-hidden="true"
                             >
-                                <circle cx="11" cy="11" r="7" />
+                                <circle
+                                    cx="11"
+                                    cy="11"
+                                    r="7"
+                                />
+
                                 <path d="m20 20-4-4" />
                             </svg>
 
@@ -356,7 +421,9 @@ export default function Index({
                                 type="search"
                                 placeholder="Search product, SKU or reason..."
                                 value={search}
-                                onChange={handleSearchChange}
+                                onChange={
+                                    handleSearchChange
+                                }
                                 aria-label="Search Stock Out transactions"
                             />
                         </div>
@@ -383,7 +450,9 @@ export default function Index({
                         </div>
                     </div>
 
-                    {/* STOCK OUT TABLE */}
+                    {/* ========================================
+                        STOCK OUT TABLE
+                    ======================================== */}
 
                     <div className="products-table-wrapper">
                         <table className="products-table">
@@ -402,135 +471,157 @@ export default function Index({
 
                             <tbody>
                                 {stockOuts.data.length > 0 ? (
-                                    stockOuts.data.map((movement) => {
-                                        const unit =
-                                            movement.product
-                                                ?.unit_of_measure ?? "pcs";
+                                    stockOuts.data.map(
+                                        (movement) => {
+                                            const unit =
+                                                movement.product
+                                                    ?.unit_of_measure ??
+                                                "pcs";
 
-                                        const quantity = Math.abs(
-                                            Number(
-                                                movement.quantity_change ?? 0
-                                            )
-                                        );
+                                            const quantity =
+                                                Math.abs(
+                                                    Number(
+                                                        movement.quantity_change ??
+                                                            0
+                                                    )
+                                                );
 
-                                        return (
-                                            <tr key={movement.id}>
-                                                {/* REFERENCE */}
+                                            return (
+                                                <tr
+                                                    key={
+                                                        movement.id
+                                                    }
+                                                >
+                                                    {/* REFERENCE */}
 
-                                                <td className="products-sku">
-                                                    SO-
-                                                    {String(movement.id).padStart(
-                                                        6,
-                                                        "0"
-                                                    )}
-                                                </td>
-
-                                                {/* DATE */}
-
-                                                <td>
-                                                    {formatDate(
-                                                        movement.created_at
-                                                    )}
-                                                </td>
-
-                                                {/* PRODUCT */}
-
-                                                <td className="products-name">
-                                                    {movement.product?.name ??
-                                                        "Unknown Product"}
-                                                </td>
-
-                                                {/* SKU */}
-
-                                                <td className="products-sku">
-                                                    {movement.product?.sku ??
-                                                        "—"}
-                                                </td>
-
-                                                {/* REASON */}
-
-                                                <td>
-                                                    {formatReason(
-                                                        movement.reason
-                                                    )}
-                                                </td>
-
-                                                {/* QUANTITY */}
-
-                                                <td>
-                                                    <span>
-                                                        -
-                                                        {formatQuantity(
-                                                            quantity,
-                                                            unit
-                                                        )}{" "}
-                                                        {unit}
-                                                    </span>
-                                                </td>
-
-                                                {/* RELEASED BY */}
-
-                                                <td>
-                                                    {movement.user?.name ??
-                                                        "—"}
-                                                </td>
-
-                                                {/* ACTIONS */}
-
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className="products-more-button"
-                                                        aria-label={`Actions for stock out ${movement.id}`}
-                                                        aria-haspopup="menu"
-                                                        aria-expanded={
-                                                            actionMenu?.movement.id ===
+                                                    <td className="products-sku">
+                                                        SO-
+                                                        {String(
                                                             movement.id
-                                                        }
-                                                        onClick={(event) =>
-                                                            toggleActionMenu(
-                                                                event,
-                                                                movement
-                                                            )
-                                                        }
-                                                    >
-                                                        <svg
-                                                            width="18"
-                                                            height="18"
-                                                            viewBox="0 0 24 24"
-                                                            fill="currentColor"
-                                                            aria-hidden="true"
+                                                        ).padStart(
+                                                            6,
+                                                            "0"
+                                                        )}
+                                                    </td>
+
+                                                    {/* DATE */}
+
+                                                    <td>
+                                                        {formatDate(
+                                                            movement.created_at
+                                                        )}
+                                                    </td>
+
+                                                    {/* PRODUCT */}
+
+                                                    <td className="products-name">
+                                                        {movement
+                                                            .product
+                                                            ?.name ??
+                                                            "Unknown Product"}
+                                                    </td>
+
+                                                    {/* SKU */}
+
+                                                    <td className="products-sku">
+                                                        {movement
+                                                            .product
+                                                            ?.sku ??
+                                                            "—"}
+                                                    </td>
+
+                                                    {/* REASON */}
+
+                                                    <td>
+                                                        {formatReason(
+                                                            movement.reason
+                                                        )}
+                                                    </td>
+
+                                                    {/* QUANTITY */}
+
+                                                    <td>
+                                                        <span>
+                                                            -
+                                                            {formatQuantity(
+                                                                quantity,
+                                                                unit
+                                                            )}{" "}
+                                                            {unit}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* RELEASED BY */}
+
+                                                    <td>
+                                                        {movement
+                                                            .user
+                                                            ?.name ??
+                                                            "—"}
+                                                    </td>
+
+                                                    {/* ACTIONS */}
+
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="products-more-button"
+                                                            aria-label={`Actions for stock out ${movement.id}`}
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={
+                                                                actionMenu
+                                                                    ?.movement
+                                                                    .id ===
+                                                                movement.id
+                                                            }
+                                                            onClick={(
+                                                                event
+                                                            ) =>
+                                                                toggleActionMenu(
+                                                                    event,
+                                                                    movement
+                                                                )
+                                                            }
                                                         >
-                                                            <circle
-                                                                cx="12"
-                                                                cy="5"
-                                                                r="1.8"
-                                                            />
+                                                            <svg
+                                                                width="18"
+                                                                height="18"
+                                                                viewBox="0 0 24 24"
+                                                                fill="currentColor"
+                                                                aria-hidden="true"
+                                                            >
+                                                                <circle
+                                                                    cx="12"
+                                                                    cy="5"
+                                                                    r="1.8"
+                                                                />
 
-                                                            <circle
-                                                                cx="12"
-                                                                cy="12"
-                                                                r="1.8"
-                                                            />
+                                                                <circle
+                                                                    cx="12"
+                                                                    cy="12"
+                                                                    r="1.8"
+                                                                />
 
-                                                            <circle
-                                                                cx="12"
-                                                                cy="19"
-                                                                r="1.8"
-                                                            />
-                                                        </svg>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
+                                                                <circle
+                                                                    cx="12"
+                                                                    cy="19"
+                                                                    r="1.8"
+                                                                />
+                                                            </svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+                                    )
                                 ) : (
                                     <tr>
                                         <td
                                             colSpan={8}
                                             className="products-empty"
                                         >
-                                            No Stock Out transactions found.
+                                            No Stock Out
+                                            transactions found.
                                         </td>
                                     </tr>
                                 )}
@@ -538,48 +629,59 @@ export default function Index({
                         </table>
                     </div>
 
-                    {/* PAGINATION */}
+                    {/* ========================================
+                        PAGINATION
+                    ======================================== */}
 
                     <div className="products-pagination">
                         <span>
-                            Showing {stockOuts.from ?? 0}–
+                            Showing{" "}
+                            {stockOuts.from ?? 0}–
                             {stockOuts.to ?? 0} of{" "}
                             {stockOuts.total} transactions
                         </span>
 
                         <div className="products-pagination-links">
-                            {stockOuts.links.map((link, index) =>
-                                link.url ? (
-                                    <Link
-                                        key={index}
-                                        href={link.url}
-                                        preserveScroll
-                                        className={`products-page-link ${
-                                            link.active ? "active" : ""
-                                        }`}
-                                    >
+                            {stockOuts.links.map(
+                                (link, index) =>
+                                    link.url ? (
+                                        <Link
+                                            key={index}
+                                            href={link.url}
+                                            preserveScroll
+                                            onClick={
+                                                closeActionMenu
+                                            }
+                                            className={`products-page-link ${
+                                                link.active
+                                                    ? "active"
+                                                    : ""
+                                            }`}
+                                        >
+                                            <span
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
+                                            />
+                                        </Link>
+                                    ) : (
                                         <span
+                                            key={index}
+                                            className="products-page-link disabled"
                                             dangerouslySetInnerHTML={{
                                                 __html: link.label,
                                             }}
                                         />
-                                    </Link>
-                                ) : (
-                                    <span
-                                        key={index}
-                                        className="products-page-link disabled"
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                )
+                                    )
                             )}
                         </div>
                     </div>
                 </section>
             </div>
 
-            {/* ACTION MENU */}
+            {/* ========================================
+                ACTION MENU
+            ======================================== */}
 
             {actionMenu &&
                 createPortal(
@@ -598,7 +700,9 @@ export default function Index({
                             role="menuitem"
                             className="products-menu-item"
                             onClick={() =>
-                                openViewModal(actionMenu.movement)
+                                openViewModal(
+                                    actionMenu.movement
+                                )
                             }
                         >
                             View
@@ -607,7 +711,9 @@ export default function Index({
                     document.body
                 )}
 
-            {/* ADD STOCK OUT MODAL */}
+            {/* ========================================
+                ADD STOCK OUT MODAL
+            ======================================== */}
 
             <AddStockOutModal
                 isOpen={addOpen}
@@ -615,11 +721,15 @@ export default function Index({
                 products={products}
             />
 
-            {/* VIEW STOCK OUT MODAL */}
+            {/* ========================================
+                VIEW STOCK OUT MODAL
+            ======================================== */}
 
             <ViewStockOutModal
                 isOpen={viewingMovement !== null}
-                onClose={() => setViewingMovement(null)}
+                onClose={() =>
+                    setViewingMovement(null)
+                }
                 movement={viewingMovement}
             />
         </InventoryLayout>
