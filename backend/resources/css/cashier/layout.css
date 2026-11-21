@@ -1,0 +1,379 @@
+
+.cashier-layout {
+    --cashier-primary: #166534;
+    --cashier-primary-hover: #14532D;
+    --cashier-green: #22C55E;
+    --cashier-accent: #DCFCE7;
+    --cashier-background: #F5F8F4;
+    --cashier-border: #E5E7EB;
+    --cashier-text: #1F2937;
+    --cashier-muted: #6B7280;
+
+    display: flex;
+    min-height: 100vh;
+    background: var(--cashier-background);
+    color: var(--cashier-text);
+    font-family: inherit;
+}
+
+.cashier-layout *,
+.cashier-layout *::before,
+.cashier-layout *::after {
+    box-sizing: border-box;
+}
+
+.cashier-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-right: 1px solid var(--cashier-border);
+    z-index: 100;
+}
+
+.cashier-sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 88px;
+    padding: 20px;
+    border-bottom: 1px solid var(--cashier-border);
+}
+
+.cashier-brand-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 11px;
+    background: var(--cashier-primary);
+    color: #FFFFFF;
+}
+
+.cashier-brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.cashier-brand-text strong {
+    color: var(--cashier-text);
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.cashier-brand-text span {
+    color: var(--cashier-muted);
+    font-size: 12px;
+}
+
+.cashier-sidebar-section {
+    flex: 1;
+    padding: 26px 12px;
+}
+
+.cashier-sidebar-label {
+    display: block;
+    padding: 0 14px;
+    margin-bottom: 14px;
+    color: var(--cashier-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+}
+
+.cashier-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.cashier-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+    border-radius: 9px;
+    color: #4B5563;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s;
+}
+
+.cashier-nav-link:hover {
+    background: #F3F4F6;
+    color: var(--cashier-primary);
+}
+
+.cashier-nav-link.active {
+    background: var(--cashier-accent);
+    color: var(--cashier-primary);
+    font-weight: 650;
+}
+
+.cashier-sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 20px;
+    border-top: 1px solid var(--cashier-border);
+}
+
+.cashier-sidebar-footer span {
+    color: var(--cashier-text);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.cashier-sidebar-footer small {
+    color: var(--cashier-muted);
+    font-size: 11px;
+}
+
+.cashier-wrapper {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    margin-left: 250px;
+}
+
+.cashier-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    min-height: 76px;
+    padding: 12px 30px;
+    background: #FFFFFF;
+    border-bottom: 1px solid var(--cashier-border);
+}
+
+.cashier-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.cashier-header-title {
+    color: var(--cashier-text);
+    font-size: 16px;
+    font-weight: 650;
+}
+
+.cashier-menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid var(--cashier-border);
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--cashier-primary);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.cashier-menu-toggle:hover {
+    background: var(--cashier-accent);
+    border-color: var(--cashier-green);
+}
+
+.cashier-account {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.cashier-account-trigger {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.cashier-account-trigger:hover,
+.cashier-account-trigger.is-open {
+    background: #F5F8F4;
+    border-color: var(--cashier-border);
+}
+
+.cashier-account-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--cashier-accent);
+    color: var(--cashier-primary);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.cashier-account-details {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.cashier-account-name {
+    color: var(--cashier-text);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.cashier-account-role {
+    color: var(--cashier-muted);
+    font-size: 11px;
+}
+
+.cashier-account-chevron {
+    color: var(--cashier-muted);
+    transition: transform 0.2s;
+}
+
+.cashier-account-chevron.rotated {
+    transform: rotate(180deg);
+}
+
+.cashier-account-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 245px;
+    padding: 8px;
+    border: 1px solid var(--cashier-border);
+    border-radius: 12px;
+    background: #FFFFFF;
+    box-shadow: 0 12px 32px rgba(31, 41, 55, 0.12);
+    z-index: 110;
+}
+
+.cashier-dropdown-user {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 12px;
+    overflow-wrap: anywhere;
+}
+
+.cashier-dropdown-user strong {
+    color: var(--cashier-text);
+    font-size: 13px;
+}
+
+.cashier-dropdown-user span {
+    color: var(--cashier-muted);
+    font-size: 12px;
+}
+
+.cashier-dropdown-footer {
+    padding-top: 8px;
+    border-top: 1px solid var(--cashier-border);
+}
+
+.cashier-logout {
+    width: 100%;
+    padding: 11px 12px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #B42318;
+    font-size: 13px;
+    font-weight: 550;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cashier-logout:hover {
+    background: #FEF2F2;
+}
+
+.cashier-content {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    padding: 28px 30px;
+}
+
+.cashier-sidebar-overlay {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .cashier-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 200;
+    }
+
+    .cashier-sidebar.is-open {
+        transform: translateX(0);
+    }
+
+    .cashier-sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 190;
+        border: 0;
+        background: rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+    }
+
+    .cashier-wrapper {
+        margin-left: 0;
+    }
+
+    .cashier-menu-toggle {
+        display: flex;
+    }
+
+    .cashier-header {
+        padding: 12px 20px;
+    }
+
+    .cashier-content {
+        padding: 22px 20px;
+    }
+}
+
+@media (max-width: 600px) {
+    .cashier-header-title {
+        font-size: 13px;
+    }
+
+    .cashier-account-details,
+    .cashier-account-chevron {
+        display: none;
+    }
+
+    .cashier-header {
+        padding: 10px 14px;
+    }
+
+    .cashier-content {
+        padding: 16px 14px;
+    }
+}

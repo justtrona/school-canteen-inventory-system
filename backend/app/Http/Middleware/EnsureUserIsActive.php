@@ -16,7 +16,11 @@ class EnsureUserIsActive
         if (
             ! $user ||
             ! $user->is_active ||
-            ! in_array($user->role, ['superadmin', 'admin'], true)
+            ! in_array($user->role, [
+                'superadmin',
+                'admin',
+                'cashier',
+            ], true)
         ) {
             Auth::logout();
 

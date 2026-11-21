@@ -29,6 +29,36 @@ export default function Sidebar() {
 
     const user = props.auth?.user;
     const isSuperadmin = user?.role === "superadmin";
+    const isCashier = user?.role === "cashier";
+
+    //cashier
+    const cashierMenuItems = [
+        {
+            section: "MAIN",
+            items: [
+                {
+                    name: "Dashboard",
+                    path: "/cashier/dashboard",
+                    icon: LayoutDashboard,
+                },
+            ],
+        },
+        {
+            section: "OPERATIONS",
+            items: [
+                {
+                    name: "Point of Sale",
+                    path: "/cashier/pos",
+                    icon: ShoppingCart,
+                },
+                {
+                    name: "Orders",
+                    path: "/cashier/orders",
+                    icon: ClipboardList,
+                },
+            ],
+        },
+    ];
 
     const menuItems = [
         {
@@ -153,7 +183,12 @@ export default function Sidebar() {
         },
     ];
 
-    const visibleMenuItems = menuItems
+    //cashier
+    const selectedMenuItems = isCashier
+        ? cashierMenuItems
+        : menuItems;
+
+    const visibleMenuItems = selectedMenuItems
         .map((group) => ({
             ...group,
             items: group.items.filter(
@@ -178,7 +213,11 @@ export default function Sidebar() {
 
                 <div className="sc-sidebar-brand">
                     <h2>School Canteen</h2>
-                    <p>Management System</p>
+                    <p>
+                        {isCashier
+                            ? "Cashier System"
+                            : "Management System"}
+                    </p>
                 </div>
             </div>
 

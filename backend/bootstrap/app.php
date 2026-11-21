@@ -1,5 +1,7 @@
+
 <?php
 
+use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\EnsureUserIsSuperadmin;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -14,18 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-
-        // Register Inertia middleware for web routes.
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);
 
-        // Custom middleware aliases.
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'superadmin' => EnsureUserIsSuperadmin::class,
+            'role' => EnsureUserHasRole::class,
         ]);
-
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
